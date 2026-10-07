@@ -1,0 +1,35 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+set -eu
+export HOME=/root
+export SDL_VIDEODRIVER=kmsdrm
+export SDL_AUDIODRIVER=alsa
+export XDG_RUNTIME_DIR=/tmp/emulationstation
+mkdir -p "$XDG_RUNTIME_DIR" "$HOME/.emulationstation" /roms/gb /roms/bios /roms/saves /roms/states
+[ -e "$HOME/.emulationstation/es_input.cfg" ] || cp /etc/emulationstation/es_input.cfg "$HOME/.emulationstation/es_input.cfg"
+chmod 700 "$XDG_RUNTIME_DIR"
+
+# Wait for the display and GPU, not a fixed boot delay or network connectivity.
+ready=0
+for attempt in $(seq 1 100); do
+	for connector in /sys/class/drm/card*-*/status; do
+		[ -r "$connector" ] || continue
+		if [ "$(cat "$connector")" = connected ] && [ -c /dev/dri/renderD128 ]; then
+			ready=1
+			break
+		fi
+	done
+	[ "$ready" = 1 ] && break
+	sleep 0.1
+done
+[ "$ready" = 1 ] || { logger -t emulationstation 'No connected DRM display'; exit 1; }
+
+# ALSA mixer defaults for the RK817 codec; keep user adjustments after boot.
+if [ ! -e /tmp/handheld-audio-ready ]; then
+	amixer -q sset 'Master' 70% unmute 2>/dev/null || true
+	amixer -q sset 'Playback Mux' SPK 2>/dev/null || true
+	touch /tmp/handheld-audio-ready
+fi
+rotation=$(handheld-rotation cw)
+chvt 1
+exec setsid -c /usr/bin/emulationstation --no-splash --screenrotate "$rotation" < /dev/tty1 > /dev/tty1 2>&1

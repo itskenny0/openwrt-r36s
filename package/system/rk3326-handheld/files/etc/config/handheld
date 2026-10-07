@@ -1,0 +1,5 @@
+config usb 'usb'
+	option mode 'host'
+
+config frontend 'frontend'
+	option enabled '1'

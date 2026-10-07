@@ -1,0 +1,41 @@
+<theme>
+  <formatVersion>4</formatVersion>
+  <view name="system, basic, detailed">
+    <image name="background" extra="true">
+      <path>./background.svg</path>
+      <pos>0 0</pos>
+      <size>1 1</size>
+    </image>
+    <helpsystem name="help">
+      <pos>0.05 0.94</pos>
+      <textColor>CADBE9</textColor>
+      <iconColor>CADBE9</iconColor>
+    </helpsystem>
+  </view>
+  <view name="system">
+    <carousel name="systemcarousel">
+      <pos>0 0.3</pos>
+      <size>1 0.35</size>
+      <color>18394FFF</color>
+      <logoScale>1.1</logoScale>
+      <logoSize>0.5 0.2</logoSize>
+    </carousel>
+    <text name="systemInfo">
+      <pos>0 0.67</pos>
+      <size>1 0.06</size>
+      <color>CADBE9</color>
+      <backgroundColor>102637</backgroundColor>
+    </text>
+  </view>
+  <view name="basic, detailed">
+    <textlist name="gamelist">
+      <pos>0.05 0.15</pos>
+      <size>0.9 0.72</size>
+      <primaryColor>E8F2F8</primaryColor>
+      <secondaryColor>9BB8CC</secondaryColor>
+      <selectedColor>FFFFFF</selectedColor>
+      <selectorColor>146CA4</selectorColor>
+      <fontSize>0.055</fontSize>
+    </textlist>
+  </view>
+</theme>

@@ -1,0 +1,26 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+set -eu
+persist=1
+case "${1:-}" in
+	status) [ "$(uci -q get handheld.usb.mode || echo host)" = gadget ]; exit ;;
+	address) uci -q get network.lan.ipaddr; exit ;;
+	host|gadget) mode=$1 ;;
+	restore) persist=0 ;;
+	*) echo "Usage: handheld-usb {status|address|host|gadget}" >&2; exit 2 ;;
+esac
+exec 8>/var/lock/handheld-usb.lock
+flock -x 8
+
+# Persist only after a successful role change. Restore the old role on failure.
+previous=$(uci -q get handheld.usb.mode || echo host)
+[ "$persist" = 1 ] || mode=$previous
+if /usr/libexec/handheld-usb-apply "$mode"; then
+	if [ "$persist" = 1 ]; then
+		uci set "handheld.usb.mode=$mode"
+		uci commit handheld
+	fi
+else
+	/usr/libexec/handheld-usb-apply "$previous" || true
+	exit 1
+fi

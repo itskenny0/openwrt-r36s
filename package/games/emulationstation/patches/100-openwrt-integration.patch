@@ -1,0 +1,88 @@
+--- a/es-app/src/guis/GuiMenu.cpp
++++ b/es-app/src/guis/GuiMenu.cpp
+@@ -18,6 +18,8 @@
+ #include "VolumeControl.h"
+ #include <SDL_events.h>
+ #include <algorithm>
++#include <cstdio>
++#include <cstdlib>
+ #include "platform.h"
+ #include "FileSorts.h"
+ #include "views/gamelist/IGameListView.h"
+@@ -29,6 +31,42 @@
+ 
+ 	if (isFullUI) {
+ 		addEntry("SCRAPER", 0x777777FF, true, [this] { openScraperSettings(); });
++		addEntry("NETWORK SETTINGS", 0x777777FF, true, [this] {
++			auto settings = new GuiSettings(mWindow, "NETWORK SETTINGS");
++			const bool initial = system("/usr/sbin/handheld-usb status >/dev/null 2>&1") == 0;
++			auto ethernet = std::make_shared<SwitchComponent>(mWindow, initial);
++			settings->addWithLabel("USB ETHERNET", ethernet);
++			Window* window = mWindow;
++			settings->addSaveFunc([window, ethernet, initial] {
++				if (ethernet->getState() == initial)
++					return;
++				const char* command = ethernet->getState()
++					? "/usr/sbin/handheld-usb gadget"
++					: "/usr/sbin/handheld-usb host";
++				if (system(command) != 0)
++					window->pushGui(new GuiMsgBox(window,
++						"USB MODE CHANGE FAILED. THE PREVIOUS SETTING WAS RESTORED.", "OK"));
++			});
++			ComponentListRow help;
++			help.addElement(std::make_shared<TextComponent>(window, "CONNECT TO LUCI", Font::get(FONT_SIZE_MEDIUM), 0x777777FF), true);
++			help.addElement(makeArrow(window), false);
++			help.makeAcceptInputHandler([window] {
++				char address[80] = {};
++				FILE* pipe = popen("/usr/sbin/handheld-usb address", "r");
++				if (pipe) {
++					if (!fgets(address, sizeof(address), pipe)) address[0] = 0;
++					pclose(pipe);
++				}
++				std::string ip(address);
++				ip.erase(std::remove(ip.begin(), ip.end(), '\n'), ip.end());
++				window->pushGui(new GuiMsgBox(window,
++					"ENABLE USB ETHERNET AND CLOSE NETWORK SETTINGS.\n"
++					"CONNECT THE OTG PORT TO YOUR COMPUTER.\nOPEN http://" + ip +
++					"/ IN YOUR BROWSER.\nUSB ACCESSORIES NEED USB ETHERNET TURNED OFF.", "OK"));
++			});
++			settings->addRow(help);
++			mWindow->pushGui(settings);
++		});
+ 		addEntry("SOUND SETTINGS", 0x777777FF, true, [this] { openSoundSettings(); });
+ 		addEntry("UI SETTINGS", 0x777777FF, true, [this] { openUISettings(); });
+ 		addEntry("GAME COLLECTION SETTINGS", 0x777777FF, true, [this] { openCollectionSystemSettings(); });
+--- a/es-core/src/platform.cpp
++++ b/es-core/src/platform.cpp
+@@ -15,7 +15,7 @@
+ #ifdef WIN32 // windows
+ 	return system("shutdown -s -t 0");
+ #else // osx / linux
+-	return system("sudo shutdown -h now");
++	return system("/sbin/poweroff");
+ #endif
+ }
+ 
+@@ -24,7 +24,7 @@
+ #ifdef WIN32 // windows
+ 	return system("shutdown -r -t 0");
+ #else // osx / linux
+-	return system("sudo shutdown -r now");
++	return system("/sbin/reboot");
+ #endif
+ }
+ 
+--- a/es-core/src/resources/ResourceManager.cpp
++++ b/es-core/src/resources/ResourceManager.cpp
+@@ -26,6 +26,11 @@
+ 	if((path[0] == ':') && (path[1] == '/'))
+ 	{
+ 		std::string test;
++
++		// System resources installed by the OpenWrt package.
++		test = "/usr/share/emulationstation/resources/" + std::string(&path[2]);
++		if(Utils::FileSystem::exists(test))
++			return test;
+ 
+ 		// check in homepath
+ 		test = Utils::FileSystem::getHomePath() + "/.emulationstation/resources/" + &path[2];

@@ -1,0 +1,97 @@
+--- a/es-core/src/utils/FileSystemUtil.cpp
++++ b/es-core/src/utils/FileSystemUtil.cpp
+@@ -14,7 +14,7 @@
+ #define getcwd _getcwd
+ #define mkdir(x,y) _mkdir(x)
+ #define snprintf _snprintf
+-#define stat64 _stat64
++#define stat _stat64
+ #define unlink _unlink
+ #define S_ISREG(x) (((x) & S_IFMT) == S_IFREG)
+ #define S_ISDIR(x) (((x) & S_IFMT) == S_IFDIR)
+@@ -578,10 +578,10 @@
+ 				CloseHandle(hFile);
+ 			}
+ #else // _WIN32
+-			struct stat64 info;
+-
+-			// check if lstat64 succeeded
+-			if(lstat64(path.c_str(), &info) == 0)
++			struct stat info;
++
++			// check if lstat succeeded
++			if(lstat(path.c_str(), &info) == 0)
+ 			{
+ 				resolved.resize(info.st_size);
+ 				if(readlink(path.c_str(), (char*)resolved.data(), resolved.size()) > 0)
+@@ -668,8 +668,8 @@
+ 			// background texture-loader thread doesn't stall the main thread
+ 			// when it tries to acquire the same mutex (e.g. Scripting::fireEvent).
+ 			const std::string path = getGenericPath(_path);
+-			struct stat64 info;
+-			bool result = (stat64(path.c_str(), &info) == 0);
++			struct stat info;
++			bool result = (stat(path.c_str(), &info) == 0);
+ 
+ 			{
+ 				const std::unique_lock<std::recursive_mutex> lock(mutex);
+@@ -699,10 +699,10 @@
+ 		bool isRegularFile(const std::string& _path)
+ 		{
+ 			const std::string path = getGenericPath(_path);
+-			struct stat64     info;
+-
+-			// check if stat64 succeeded
+-			if(stat64(path.c_str(), &info) != 0)
++			struct stat     info;
++
++			// check if stat succeeded
++			if(stat(path.c_str(), &info) != 0)
+ 				return false;
+ 
+ 			// check for S_IFREG attribute
+@@ -715,10 +715,10 @@
+ 		bool isDirectory(const std::string& _path)
+ 		{
+ 			const std::string path = getGenericPath(_path);
+-			struct stat64     info;
+-
+-			// check if stat64 succeeded
+-			if(stat64(path.c_str(), &info) != 0)
++			struct stat     info;
++
++			// check if stat succeeded
++			if(stat(path.c_str(), &info) != 0)
+ 				return false;
+ 
+ 			// check for S_IFDIR attribute
+@@ -738,10 +738,10 @@
+ 			if((Attributes != INVALID_FILE_ATTRIBUTES) && (Attributes & FILE_ATTRIBUTE_REPARSE_POINT))
+ 				return true;
+ #else // _WIN32
+-			struct stat64 info;
+-
+-			// check if lstat64 succeeded
+-			if(lstat64(path.c_str(), &info) != 0)
++			struct stat info;
++
++			// check if lstat succeeded
++			if(lstat(path.c_str(), &info) != 0)
+ 				return false;
+ 
+ 			// check for S_IFLNK attribute
+@@ -785,10 +785,10 @@
+ 			// regular files and executables, but not setuid, setgid, shared text
+ 			const mode_t mask = S_IFREG;
+ 			const mode_t mask_exec = S_IXUSR | S_IXGRP | S_IXOTH;
+-			struct stat64 info;
+-
+-			// check if stat64 succeeded
+-			if(stat64(path.c_str(), &info) != 0)
++			struct stat info;
++
++			// check if stat succeeded
++			if(stat(path.c_str(), &info) != 0)
+ 				return false;
+ 
+ 			// check for mask attributes

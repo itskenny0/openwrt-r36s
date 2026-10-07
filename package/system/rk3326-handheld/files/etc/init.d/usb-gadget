@@ -1,0 +1,22 @@
+#!/bin/sh /etc/rc.common
+# SPDX-License-Identifier: GPL-2.0-only
+# Start after the frontend is launched so USB enumeration cannot delay it.
+START=26
+STOP=89
+USE_PROCD=1
+
+start_service() {
+	/usr/sbin/handheld-usb restore
+}
+
+reload_service() {
+	start_service
+}
+
+stop_service() {
+	/usr/libexec/handheld-usb-apply host
+}
+
+service_triggers() {
+	procd_add_reload_trigger handheld
+}

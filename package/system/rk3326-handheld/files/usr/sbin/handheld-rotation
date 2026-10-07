@@ -1,0 +1,17 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# DT and RetroArch use counter-clockwise degrees; EmulationStation uses clockwise turns.
+set -eu
+turns=0
+property=/sys/firmware/devicetree/base/dsi@ff450000/panel@0/rotation
+if [ -r "$property" ]; then
+	degrees=$(hexdump -v -e '1/1 "%02x"' "$property")
+	case "$degrees" in
+		00000000) turns=0 ;;
+		0000005a) turns=1 ;;
+		000000b4) turns=2 ;;
+		0000010e) turns=3 ;;
+	esac
+fi
+[ "${1:-ccw}" != cw ] || turns=$(((4 - turns) % 4))
+echo "$turns"

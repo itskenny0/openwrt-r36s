@@ -1,0 +1,25 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# Keep LAN available before a USB host selects either gadget configuration.
+# Preserve saved network settings when this script runs after sysupgrade.
+. /lib/functions.sh
+# BusyBox ash supports local; config_foreach invokes this callback indirectly.
+# shellcheck disable=SC3043,SC2317
+allow_empty_bridge() {
+	local name empty
+	config_get name "$1" name
+	config_get empty "$1" bridge_empty
+	[ "$name" = br-lan ] && [ -z "$empty" ] || return 0
+	uci set "network.$1.bridge_empty=1"
+}
+config_load network
+config_foreach allow_empty_bridge device
+uci commit network
+
+# This kernel and graphics stack need packages from the matching release.
+# Custom feed entries are kept separately and survive configuration backups.
+feeds=/etc/apk/repositories.d/distfeeds.list
+if [ -f "$feeds" ]; then
+	sed -i '/^https:\/\/downloads.openwrt.org\//s/^/# /' "$feeds"
+fi
+exit 0

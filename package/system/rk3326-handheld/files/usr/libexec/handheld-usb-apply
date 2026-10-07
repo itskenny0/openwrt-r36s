@@ -1,0 +1,77 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+set -eu
+mode=${1:-host}
+case "$mode" in host|gadget) ;; *) exit 2 ;; esac
+exec 9>/var/lock/handheld-usb-role.lock
+flock -x 9
+
+g=/sys/kernel/config/usb_gadget/openwrt
+role=
+for candidate in /sys/class/usb_role/*/role; do
+	[ -w "$candidate" ] || continue
+	role=$candidate
+	break
+done
+[ -n "$role" ] || { logger -t usb-gadget 'USB role switch is unavailable'; exit 1; }
+
+if [ -e "$g/UDC" ] && [ -n "$(cat "$g/UDC")" ]; then
+	printf '\n' > "$g/UDC"
+fi
+if [ "$mode" = host ]; then
+	echo host > "$role"
+	exit
+fi
+
+grep -qs ' /sys/kernel/config configfs ' /proc/mounts || mount -t configfs configfs /sys/kernel/config
+mkdir -p "$g"
+# Reapply all attributes while unbound, including after an interrupted setup.
+# Function attributes cannot change while a configuration references them.
+for link in "$g/configs/c.1/ecm.usb0" "$g/configs/c.2/rndis.usb1" "$g/os_desc/c.2"; do
+	[ ! -L "$link" ] || rm "$link"
+done
+
+echo 0x1d6b > "$g/idVendor"
+echo 0x0104 > "$g/idProduct"
+echo 0x0200 > "$g/bcdUSB"
+echo 0x0100 > "$g/bcdDevice"
+echo 0xef > "$g/bDeviceClass"
+echo 0x02 > "$g/bDeviceSubClass"
+echo 0x01 > "$g/bDeviceProtocol"
+mkdir -p "$g/strings/0x409"
+serial=$(tr -cd '[:alnum:]' < /sys/firmware/devicetree/base/serial-number 2>/dev/null || true)
+[ -n "$serial" ] || serial=$(cat /etc/machine-id 2>/dev/null || echo rk3326)
+printf '%s\n' "$serial" > "$g/strings/0x409/serialnumber"
+echo OpenWrt > "$g/strings/0x409/manufacturer"
+echo 'OpenWrt handheld USB Ethernet' > "$g/strings/0x409/product"
+mkdir -p "$g/functions/ecm.usb0" "$g/functions/rndis.usb1"
+# Stable, locally administered addresses derived from this device's identity.
+digest=$(printf '%s' "$serial" | md5sum | cut -c 1-8 | sed 's/../&:/g;s/:$//')
+for function in ecm.usb0 rndis.usb1; do
+	echo "02:$digest:01" > "$g/functions/$function/dev_addr"
+	echo "02:$digest:02" > "$g/functions/$function/host_addr"
+done
+mkdir -p "$g/configs/c.1/strings/0x409" "$g/configs/c.2/strings/0x409"
+echo 'CDC ECM' > "$g/configs/c.1/strings/0x409/configuration"
+echo 'RNDIS' > "$g/configs/c.2/strings/0x409/configuration"
+echo 250 > "$g/configs/c.1/MaxPower"
+echo 250 > "$g/configs/c.2/MaxPower"
+[ -L "$g/configs/c.1/ecm.usb0" ] || ln -s "$g/functions/ecm.usb0" "$g/configs/c.1/ecm.usb0"
+[ -L "$g/configs/c.2/rndis.usb1" ] || ln -s "$g/functions/rndis.usb1" "$g/configs/c.2/rndis.usb1"
+echo 1 > "$g/os_desc/use"
+echo 0xcd > "$g/os_desc/b_vendor_code"
+echo MSFT100 > "$g/os_desc/qw_sign"
+echo RNDIS > "$g/functions/rndis.usb1/os_desc/interface.rndis/compatible_id"
+echo 5162001 > "$g/functions/rndis.usb1/os_desc/interface.rndis/sub_compatible_id"
+[ -L "$g/os_desc/c.2" ] || ln -s "$g/configs/c.2" "$g/os_desc/c.2"
+echo device > "$role"
+for attempt in 1 2 3 4 5; do
+	for controller in /sys/class/udc/*; do
+		[ -e "$controller" ] || continue
+		basename "$controller" > "$g/UDC"
+		exit 0
+	done
+	sleep 1
+done
+logger -t usb-gadget 'USB device controller did not appear'
+exit 1
