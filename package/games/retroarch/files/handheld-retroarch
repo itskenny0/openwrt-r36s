@@ -1,0 +1,7 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+set -eu
+mkdir -p /tmp/handheld
+chmod 700 /tmp/handheld
+printf 'video_rotation = "%s"\n' "$(handheld-rotation ccw)" > /tmp/handheld/retroarch-display.cfg
+exec /usr/bin/retroarch --appendconfig /tmp/handheld/retroarch-display.cfg "$@"

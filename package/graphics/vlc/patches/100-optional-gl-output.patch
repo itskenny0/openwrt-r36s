@@ -1,0 +1,31 @@
+--- a/configure.ac
++++ b/configure.ac
+@@ -3134,14 +3134,20 @@
+ dnl
+ dnl  OpenGL
+ dnl
++AC_ARG_ENABLE([egl], AS_HELP_STRING([--disable-egl], [disable EGL output]))
++have_egl="no"
++AS_IF([test "${enable_egl}" != "no"], [
+ PKG_CHECK_MODULES([EGL], [egl], [
+   have_egl="yes"
+ ], [
+   have_egl="no"
+ ])
++])
+ AM_CONDITIONAL([HAVE_EGL], [test "${have_egl}" = "yes"])
+ 
++AC_ARG_ENABLE([gl], AS_HELP_STRING([--disable-gl], [disable OpenGL output]))
+ have_gl="no"
++AS_IF([test "${enable_gl}" != "no"], [
+ PKG_CHECK_MODULES([GL], [gl], [
+   have_gl="yes"
+ ], [
+@@ -3163,6 +3169,7 @@
+     ])
+   ])
+   AC_MSG_RESULT([${have_gl}])
++])
+ ])
+ AM_CONDITIONAL([HAVE_GL], [test "${have_gl}" = "yes"])
+ AS_IF([test "${have_gl}" = "yes"], [
