@@ -26,7 +26,7 @@ define Host/Compile
 	$(MAKE) $(HOST_JOBS) -C $(HOST_BUILD_DIR)/squashfs-tools \
 		LZ4_SUPPORT=0 \
 		LZO_SUPPORT=0 \
-		ZSTD_SUPPORT=0 \
+		ZSTD_SUPPORT=1 \
 		GZIP_SUPPORT=1 \
 		XZ_SUPPORT=1 \
 		LZMA_XZ_SUPPORT=1 \

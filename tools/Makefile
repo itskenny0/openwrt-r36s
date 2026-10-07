@@ -132,7 +132,7 @@ $(curdir)/pkgconf/compile := $(curdir)/meson/compile
 $(curdir)/quilt/compile := $(curdir)/autoconf/compile $(curdir)/findutils/compile
 $(curdir)/sdcc/compile := $(curdir)/bison/compile
 $(curdir)/squashfs3-lzma/compile := $(curdir)/lzma-old/compile
-$(curdir)/squashfs4/compile := $(curdir)/xz/compile $(curdir)/zlib/compile
+$(curdir)/squashfs4/compile := $(curdir)/xz/compile $(curdir)/zlib/compile $(curdir)/zstd/compile
 $(curdir)/util-linux/compile := $(curdir)/bison/compile $(curdir)/meson/compile
 $(curdir)/yafut/compile := $(curdir)/cmake/compile
 
