@@ -1,7 +1,62 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-2.0-only
 set -eu
-mkdir -p /tmp/handheld
+umask 077
+mkdir -p /tmp/handheld /var/lock
 chmod 700 /tmp/handheld
-printf 'video_rotation = "%s"\n' "$(handheld-rotation ccw)" > /tmp/handheld/retroarch-display.cfg
-exec /usr/bin/retroarch --appendconfig /tmp/handheld/retroarch-display.cfg "$@"
+exec 9>/var/lock/handheld-game.lock
+flock -n 9 || exit 1
+rm -f /tmp/handheld/launch-error
+fail() {
+	printf '%s\n' "$1" > /tmp/handheld/launch-error
+	printf '%s\n' "$1" >&2
+	exit 1
+}
+[ "$#" = 2 ] || fail 'Choose a system and a game file.'
+system=$1
+rom=$2
+core=
+while IFS='|' read -r id _ _ _ library _; do
+	[ "$id" = "$system" ] || continue
+	core=$library
+	break
+done < /usr/share/retroarch/systems.tsv
+[ -n "$core" ] || fail 'This game system is not configured.'
+[ -r "$rom" ] || fail 'The game file is missing or unreadable. Check the ROM card.'
+[ -r "/usr/lib/libretro/${core}_libretro.so" ] || fail 'The emulator is missing. Reinstall its package or update the firmware.'
+/usr/bin/handheld-game-dirs || fail 'Game storage is not writable. Check the ROM card and free space.'
+# Check actual writes as a read-only mount or full card can otherwise lose saves.
+for path in "/roms/saves/$system" "/roms/states/$system"; do
+	: > "$path/.write-test" || fail 'Save storage is full or read-only. Free space before playing.'
+	rm -f "$path/.write-test"
+done
+case "$system" in
+	segacd)
+		[ -s /roms/bios/bios_CD_E.bin ] || [ -s /roms/bios/bios_CD_U.bin ] || [ -s /roms/bios/bios_CD_J.bin ] ||
+			fail 'Sega CD needs a BIOS for the game region in /roms/bios: bios_CD_E.bin, bios_CD_U.bin or bios_CD_J.bin.' ;;
+	pcenginecd)
+		[ -s /roms/bios/syscard3.pce ] || fail 'PC Engine CD needs syscard3.pce in /roms/bios.' ;;
+	psp)
+		[ -s /roms/bios/PPSSPP/compat.ini ] || fail 'PSP assets are missing. Restore /roms/bios/PPSSPP from /usr/share/retroarch/system/PPSSPP.' ;;
+esac
+cat > /tmp/handheld/retroarch-display.cfg <<EOF
+video_rotation = "$(handheld-rotation ccw)"
+savefile_directory = "/roms/saves/$system"
+savestate_directory = "/roms/states/$system"
+EOF
+child=
+stop() {
+	trap '' TERM INT HUP
+	if [ -n "$child" ]; then
+		kill -TERM "$child" 2>/dev/null || true
+		wait "$child" || true
+	fi
+	exit 0
+}
+trap stop TERM INT HUP
+/usr/bin/retroarch --config /etc/retroarch.cfg --appendconfig /tmp/handheld/retroarch-display.cfg \
+	-L "/usr/lib/libretro/${core}_libretro.so" "$rom" > /tmp/handheld/retroarch.log 2>&1 &
+child=$!
+status=0
+wait "$child" || status=$?
+[ "$status" = 0 ] || fail 'The emulator could not run this game. Check its format and BIOS. Details: /tmp/handheld/retroarch.log'

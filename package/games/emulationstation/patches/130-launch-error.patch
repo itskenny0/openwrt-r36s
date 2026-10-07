@@ -1,0 +1,38 @@
+--- a/es-app/src/FileData.cpp
++++ b/es-app/src/FileData.cpp
+@@ -16,6 +16,9 @@
+ #include "VolumeControl.h"
+ #include "Window.h"
+ #include <assert.h>
++#include "guis/GuiMsgBox.h"
++#include <cstdio>
++#include <fstream>
+ 
+ FileData::FileData(FileType type, const std::string& path, SystemEnvironmentData* envData, SystemData* system)
+ 	: mType(type), mPath(path), mSystem(system), mEnvData(envData), mSourceFileData(NULL), mParent(NULL), metadata(type == GAME ? GAME_METADATA : FOLDER_METADATA) // metadata is REALLY set in the constructor!
+@@ -299,6 +302,7 @@
+ 	Scripting::fireEvent("game-start", rom, basename, name);
+ 
+ 	LOG(LogInfo) << "	" << command;
++	std::remove("/tmp/handheld/launch-error");
+ 	int exitCode = runSystemCommand(command);
+ 
+ 	if(exitCode != 0)
+@@ -312,6 +316,17 @@
+ 	InputManager::getInstance()->init();
+ 	VolumeControl::getInstance()->init();
+ 	window->normalizeNextUpdate();
++
++	if (exitCode != 0)
++	{
++		std::ifstream error("/tmp/handheld/launch-error");
++		char message[1024] = {};
++		error.getline(message, sizeof(message));
++		window->pushGui(new GuiMsgBox(window, message[0] ? message :
++			"THE GAME COULD NOT START. CHECK THE GAME FILE, EMULATOR AND BIOS.", "OK"));
++		std::remove("/tmp/handheld/launch-error");
++		return;
++	}
+ 
+ 	//update number of times the game has been launched
+ 

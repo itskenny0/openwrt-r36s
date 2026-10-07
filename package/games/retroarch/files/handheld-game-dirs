@@ -1,0 +1,24 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+set -eu
+set -- /roms/bios /roms/saves /roms/states
+while IFS='|' read -r system _; do
+	case "$system" in ''|'#'*) continue ;; esac
+	set -- "$@" "/roms/$system" "/roms/saves/$system" "/roms/states/$system"
+done < /usr/share/retroarch/systems.tsv
+mkdir -p "$@"
+# Leave user-provided BIOS and asset directories intact, including on ROM cards.
+for assets in /usr/share/retroarch/system/*; do
+	[ -d "$assets" ] || continue
+	name=${assets##*/}
+	destination="/roms/bios/$name"
+	[ -e "$destination" ] || [ -L "$destination" ] && continue
+	ln -s "$assets" "$destination" 2>/dev/null && continue
+	# FAT/exFAT games cards cannot store symlinks. Publish a complete copy only.
+	temporary=$(mktemp -d "/roms/bios/.$name.XXXXXX")
+	if cp -R "$assets/." "$temporary/" && mv "$temporary" "$destination"; then
+		continue
+	fi
+	rm -rf "$temporary"
+	exit 1
+done

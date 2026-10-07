@@ -5,7 +5,8 @@ export HOME=/root
 export SDL_VIDEODRIVER=kmsdrm
 export SDL_AUDIODRIVER=alsa
 export XDG_RUNTIME_DIR=/tmp/emulationstation
-mkdir -p "$XDG_RUNTIME_DIR" "$HOME/.emulationstation" /roms/gb /roms/bios /roms/saves /roms/states
+mkdir -p "$XDG_RUNTIME_DIR" "$HOME/.emulationstation"
+handheld-game-dirs || logger -t emulationstation 'Game storage could not be prepared'
 [ -e "$HOME/.emulationstation/es_input.cfg" ] || cp /etc/emulationstation/es_input.cfg "$HOME/.emulationstation/es_input.cfg"
 chmod 700 "$XDG_RUNTIME_DIR"
 

@@ -8,7 +8,7 @@ Record the release tag, image checksum, exact board/panel revision, SD card mode
 
 1. Cold boot on battery. Confirm the selected panel initializes without flickering, artifacts or incorrect rotation. Repeat with charging connected.
 2. Confirm EmulationStation appears and every button, D-pad direction and stick works. Check menu accept/back and Start. Confirm the correct mapping is used after reboot.
-3. Launch a legally obtained Game Boy test ROM, check audio/video and exit with Select + Start. Check saves persist after shutdown and reboot.
+3. Launch games from the [system list](EMULATORS.md), check audio/video and exit with Select + Start. Check in-game saves and save states survive exit, shutdown and reboot. Check Select + X opens RetroArch and returns to the game. Test N64, Dreamcast and PSP separately; record the title, core options, measured frame rate, audio glitches and session length. Test a missing BIOS and an invalid game file to confirm the error is visible and the frontend remains usable.
 4. Enable USB Ethernet in Start → Network Settings. On Linux, macOS and Windows, confirm enumeration, DHCP, ping, SSH and LuCI. Set a root password. Repeat cable unplug/replug and reboot with the setting enabled.
 5. Disable USB Ethernet and attach a supported USB Wi-Fi or Ethernet adapter. Verify link, DHCP and traffic, then switch back. Test Bluetooth discovery/pairing with a supported adapter. Record chipset IDs and firmware errors from the kernel log.
 6. Check battery/charging information, speaker and headphone output, brightness and temperatures during an extended game session. Headphone routing may require ALSA mixer adjustment in this initial port.

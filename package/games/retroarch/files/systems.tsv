@@ -1,0 +1,18 @@
+# id|name|platform|theme|core|extensions
+gb|Game Boy|gb|gb|gambatte|gb
+gbc|Game Boy Color|gbc|gbc|gambatte|gbc
+nes|Nintendo Entertainment System|nes|nes|fceumm|nes fds unif unf
+snes|Super Nintendo|snes|snes|snes9x|sfc smc
+gba|Game Boy Advance|gba|gba|mgba|gba
+mastersystem|Master System|mastersystem|mastersystem|genesis_plus_gx|sms
+gamegear|Game Gear|gamegear|gamegear|genesis_plus_gx|gg
+megadrive|Mega Drive|megadrive|megadrive|genesis_plus_gx|md gen bin smd
+segacd|Sega CD|segacd|segacd|genesis_plus_gx|cue chd
+pcengine|PC Engine|pcengine|pcengine|mednafen_pce_fast|pce
+pcenginecd|PC Engine CD|pcengine|pcenginecd|mednafen_pce_fast|cue chd
+psx|PlayStation|psx|psx|pcsx_rearmed|cue chd pbp m3u exe
+n64|Nintendo 64|n64|n64|mupen64plus_next|z64 n64 v64
+dreamcast|Dreamcast|dreamcast|dreamcast|flycast2021|gdi cue chd cdi m3u
+psp|PlayStation Portable|psp|psp|ppsspp|iso cso chd pbp elf prx
+arcade|Arcade|arcade|arcade|fbneo|zip 7z
+neogeo|Neo Geo|neogeo|neogeo|fbneo|zip 7z

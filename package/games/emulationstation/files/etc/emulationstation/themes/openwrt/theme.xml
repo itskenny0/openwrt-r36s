@@ -13,6 +13,11 @@
     </helpsystem>
   </view>
   <view name="system">
+    <text name="logoText">
+      <color>F1F6FB</color>
+      <fontSize>0.065</fontSize>
+      <forceUppercase>true</forceUppercase>
+    </text>
     <carousel name="systemcarousel">
       <pos>0 0.3</pos>
       <size>1 0.35</size>
