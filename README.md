@@ -1,108 +1,33 @@
-![OpenWrt logo](include/logo.png)
+# OpenWrt for RK3326 handhelds
 
-OpenWrt Project is a Linux operating system targeting embedded devices. Instead
-of trying to create a single, static firmware, OpenWrt provides a fully
-writable filesystem with package management. This frees you from the
-application selection and configuration provided by the vendor and allows you
-to customize the device through the use of packages to suit any application.
-For developers, OpenWrt is the framework to build an application without having
-to build a complete firmware around it; for users this means the ability for
-full customization, to use the device in ways never envisioned.
+OpenWrt with EmulationStation on the R36S and the RK3326 handheld families described by ROCKNIX. The default image is for an **original R36S with Panel 4**.
 
-Sunshine!
+This is a hardware bring-up port. CI builds and checks the firmware; a passing build does not establish that a particular console boots. See the [hardware test checklist](docs/TESTING.md) before reporting a working device.
 
-## Download
+- Mainline Linux 6.18 LTS with OpenWrt and ROCKNIX board-support patches.
+- OpenWrt's procd, UCI, netifd, firewall, squashfs/overlay root and sysupgrade.
+- LuCI preinstalled; USB Ethernet is a persistent EmulationStation setting.
+- EmulationStation on SDL2 KMS/DRM, Mesa Panfrost and ALSA.
+- RetroArch and the Gambatte Game Boy / Game Boy Color core. No games or BIOS files are included.
+- Wi-Fi, Bluetooth and USB Ethernet adapter drivers, with networking independent of frontend startup.
+- GitHub Actions builds all device profiles and publishes tagged prereleases with checksums and package archives.
 
-Built firmware images are available for many architectures and come with a
-package selection to be used as WiFi home router. To quickly find a factory
-image usable to migrate from a vendor stock firmware to OpenWrt, try the
-*Firmware Selector*.
+## Install
 
-* [OpenWrt Firmware Selector](https://firmware-selector.openwrt.org/)
+Download the image matching your device from [Releases](https://github.com/itskenny0/openwrt-r36s/releases). For the original R36S Panel 4, choose the file containing `gameconsole_r36s`. Verify it against `SHA256SUMS`, then write the image to a spare microSD card with an image writer that supports `.img.gz`. Writing an image replaces that card's contents. Keep the original card for recovery.
 
-If your device is supported, please follow the **Info** link to see install
-instructions or consult the support resources listed below.
+Put the card in the OS/TF1 slot. EmulationStation starts automatically. For other panels and clone hardware, follow [device and panel setup](docs/HARDWARE.md).
 
-##
+In EmulationStation, press **Start → Network Settings → USB Ethernet**, enable the switch and leave the menu to apply it. Connect a data cable from the console's OTG port to your computer. The computer should obtain an address by DHCP. Open **http://192.168.1.1/** for LuCI; **Connect to LuCI** in the same menu shows the configured address. Set a root password on first use. Standard OpenWrt SSH access is also available.
 
-An advanced user may require additional or specific package. (Toolchain, SDK, ...) For everything else than simple firmware download, try the wiki download page:
+The USB setting defaults to host mode so USB peripherals can be used. Disable USB Ethernet before connecting a Wi-Fi adapter to the same port. Charging-only ports and cables cannot carry Ethernet. Linux/macOS use CDC ECM; the second USB configuration provides RNDIS for Windows. Host driver selection still needs hardware testing.
 
-* [OpenWrt Wiki Download](https://openwrt.org/downloads)
+Copy your own `.gb` / `.gbc` files to `/roms/gb` over SSH/SCP, then restart EmulationStation to refresh the list. Select + Start exits RetroArch. Configure additional systems in `/etc/emulationstation/es_systems.cfg`. Mount a separate games card at `/roms` using **LuCI → System → Mount Points**. The initial root partition is 512 MiB; it does not automatically fill the SD card.
 
-## Development
+Use **Start → Quit → Shutdown System** before removing power. Suspend, automatic headphone routing and physical power-button shortcuts are not yet provided by the frontend integration.
 
-To build your own firmware you need a GNU/Linux, BSD or macOS system (case
-sensitive filesystem required). Cygwin is unsupported because of the lack of a
-case sensitive file system.
+## Build and maintain
 
-### Requirements
+See [build instructions](docs/BUILD.md), [hardware profiles](docs/HARDWARE.md), [boot tuning and testing](docs/TESTING.md), and [source provenance](docs/UPSTREAM.md). The original OpenWrt introduction is preserved in [README.openwrt.md](README.openwrt.md).
 
-You need the following tools to compile OpenWrt, the package names vary between
-distributions. A complete list with distribution specific packages is found in
-the [Build System Setup](https://openwrt.org/docs/guide-developer/build-system/install-buildsystem)
-documentation.
-
-```
-binutils bzip2 diff find flex gawk gcc-6+ getopt grep install libc-dev libz-dev
-make4.1+ perl python3.8+ rsync subversion unzip which
-```
-
-### Quickstart
-
-1. Run `./scripts/feeds update -a` to obtain all the latest package definitions
-   defined in feeds.conf / feeds.conf.default
-
-2. Run `./scripts/feeds install -a` to install symlinks for all obtained
-   packages into package/feeds/
-
-3. Run `make menuconfig` to select your preferred configuration for the
-   toolchain, target system & firmware packages.
-
-4. Run `make` to build your firmware. This will download all sources, build the
-   cross-compile toolchain and then cross-compile the GNU/Linux kernel & all chosen
-   applications for your target system.
-
-### Related Repositories
-
-The main repository uses multiple sub-repositories to manage packages of
-different categories. All packages are installed via the OpenWrt package
-manager called `opkg`. If you're looking to develop the web interface or port
-packages to OpenWrt, please find the fitting repository below.
-
-* [LuCI Web Interface](https://github.com/openwrt/luci): Modern and modular
-  interface to control the device via a web browser.
-
-* [OpenWrt Packages](https://github.com/openwrt/packages): Community repository
-  of ported packages.
-
-* [OpenWrt Routing](https://github.com/openwrt/routing): Packages specifically
-  focused on (mesh) routing.
-
-* [OpenWrt Video](https://github.com/openwrt/video): Packages specifically
-  focused on display servers and clients (Xorg and Wayland).
-
-## Support Information
-
-For a list of supported devices see the [OpenWrt Hardware Database](https://openwrt.org/supported_devices)
-
-### Documentation
-
-* [Quick Start Guide](https://openwrt.org/docs/guide-quick-start/start)
-* [User Guide](https://openwrt.org/docs/guide-user/start)
-* [Developer Documentation](https://openwrt.org/docs/guide-developer/start)
-* [Technical Reference](https://openwrt.org/docs/techref/start)
-
-### Support Community
-
-* [Forum](https://forum.openwrt.org): For usage, projects, discussions and hardware advise.
-* [Support Chat](https://webchat.oftc.net/#openwrt): Channel `#openwrt` on **oftc.net**.
-
-### Developer Community
-
-* [Bug Reports](https://bugs.openwrt.org): Report bugs in OpenWrt
-* [Dev Mailing List](https://lists.openwrt.org/mailman/listinfo/openwrt-devel): Send patches
-* [Dev Chat](https://webchat.oftc.net/#openwrt-devel): Channel `#openwrt-devel` on **oftc.net**.
-
-## License
-
-OpenWrt is licensed under GPL-2.0
+This repository is based on OpenWrt development sources, with feeds locked to commits. It is not an official OpenWrt release. Use the matching release's package archive for kernel modules; modules from unrelated OpenWrt builds will not match this kernel.

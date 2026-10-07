@@ -1,8 +1,3 @@
-Thanks for your contribution to OpenWrt!
+Describe the problem and the resulting behavior.
 
-To help keep the codebase consistent and readable,
-and to help people review your contribution,
-we ask you to follow the rules you find in the wiki at this link
-https://openwrt.org/submitting-patches
-
-Please remove this message before posting the pull request.
+List build checks and hardware tested, including the board and panel revision. Identify anything that still needs physical validation.

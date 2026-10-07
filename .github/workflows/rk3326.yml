@@ -1,0 +1,107 @@
+name: RK3326 firmware
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rk3326-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Check integration
+        run: |
+          python3 -m unittest discover -s tests -v
+          git diff --check
+          shellcheck -s sh scripts/rk3326-*.sh scripts/gen_rk3326_image.sh
+          shellcheck -s sh -e SC1091,SC2034 package/system/rk3326-handheld/files/etc/init.d/* package/system/rk3326-handheld/files/usr/sbin/* package/system/rk3326-handheld/files/usr/libexec/* package/games/emulationstation/files/etc/init.d/* package/games/emulationstation/files/usr/bin/*
+          shellcheck -s sh package/games/retroarch/files/handheld-retroarch
+          shellcheck -s sh -e SC1091 package/system/rk3326-handheld/files/etc/uci-defaults/*
+  build:
+    needs: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Reclaim unused runner SDK space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /usr/local/.ghcup /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h "$GITHUB_WORKSPACE"
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang flex bison g++ gawk gcc-multilib gettext git libncurses-dev libssl-dev python3 python3-setuptools python3-pyelftools python3-dev rsync swig unzip zlib1g-dev file wget curl libelf-dev device-tree-compiler qemu-user
+      - name: Configure all handheld profiles
+        run: ./scripts/rk3326-configure.sh all
+      - name: Download sources
+        run: make -j8 download V=s
+      - name: Build firmware
+        run: |
+          mkdir -p .work/logs
+          make -j"$(nproc)" V=s 2>&1 | tee .work/logs/build.log
+      - name: Validate release payload
+        run: |
+          python3 scripts/rk3326-check-config.py
+          python3 scripts/rk3326-check-kernel.py build_dir/target-*/linux-rk3326*/linux-6.18.*/.config
+          python3 scripts/rk3326-check-images.py bin/targets/rk3326/generic
+          python3 scripts/rk3326-smoke.py
+          ./scripts/diffconfig.sh > bin/targets/rk3326/generic/build.config
+          cp feeds.conf.default bin/targets/rk3326/generic/feeds.lock
+          cp docs/TESTING.md bin/targets/rk3326/generic/TESTING.md
+          git rev-parse HEAD > bin/targets/rk3326/generic/source.commit
+          cd bin/targets/rk3326/generic
+          tar -czf packages.tar.gz -C ../../../ packages targets/rk3326/generic/packages
+          sha256sum ./*.img.gz ./*.manifest build.config feeds.lock source.commit TESTING.md packages.tar.gz > SHA256SUMS
+      - name: Upload firmware and package feed
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: rk3326-firmware
+          path: |
+            bin/targets/rk3326/generic/
+            bin/packages/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+      - name: Upload build diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: build-diagnostics
+          path: |
+            .work/logs/
+            logs/
+            .config
+          retention-days: 7
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: rk3326-firmware
+          path: release
+      - name: Publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          cd release/targets/rk3326/generic
+          sha256sum -c SHA256SUMS
+          gh release create "$RELEASE_TAG" --verify-tag --prerelease --title "OpenWrt RK3326 $RELEASE_TAG" --notes-file "$GITHUB_WORKSPACE/docs/RELEASE.md" ./*.img.gz ./*.manifest ./SHA256SUMS ./build.config ./feeds.lock ./source.commit ./TESTING.md ./packages.tar.gz

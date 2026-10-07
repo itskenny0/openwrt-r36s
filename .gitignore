@@ -35,3 +35,8 @@ git-src
 .cproject
 .ccache
 .vscode*
+
+/.work/
+/lost+found/
+__pycache__/
+*.pyc

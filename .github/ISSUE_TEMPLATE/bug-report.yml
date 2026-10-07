@@ -1,95 +1,35 @@
-name: Bug report
-description: Create a bug report to help us improve
-labels:
-  - bug
-  - bug-report
-  - to-triage
+name: Hardware or firmware issue
+description: Report a problem with the RK3326 OpenWrt port
 body:
-  - type: textarea
-    id: description
+  - type: input
+    id: image
     attributes:
-      label: Describe the bug
-      description: A clear and concise description of the bug.
+      label: Release and image checksum
+      description: Include the image filename, tag or commit, and SHA-256.
     validations:
       required: true
   - type: input
-    id: version
+    id: hardware
     attributes:
-      label: OpenWrt version
-      description: |
-        The OpenWrt release or commit hash where this bug occurs (use command below).
-        ```. /etc/openwrt_release && echo $DISTRIB_REVISION```
-    validations:
-      required: true
-  - type: input
-    id: release
-    attributes:
-      label: OpenWrt release
-      description: |
-        The OpenWrt release or commit hash where this bug occurs (use command below).
-        ```. /etc/openwrt_release && echo $DISTRIB_RELEASE```
-    validations:
-      required: true
-  - type: input
-    id: target
-    attributes:
-      label: OpenWrt target/subtarget
-      description: |
-        The OpenWrt target and subtarget where this bug is observed (use command below).
-        ```. /etc/openwrt_release && echo $DISTRIB_TARGET```
-    validations:
-      required: true
-  - type: input
-    id: device
-    attributes:
-      label: Device
-      description: |
-        The device exhibiting this bug (if unsure, use command below).
-        ```cat /tmp/sysinfo/model```
-    validations:
-      required: true
-  - type: dropdown
-    id: image_kind
-    attributes:
-      label: Image kind
-      options:
-        - Official downloaded image
-        - Self-built image
+      label: Console and panel
+      description: Exact model, original or clone, board revision and panel revision if known.
     validations:
       required: true
   - type: textarea
     id: reproduce
     attributes:
-      label: Steps to reproduce
-      description: Steps to reproduce the reported behaviour.
+      label: Reproduction and result
+      description: What you did, what happened, and what you expected. Include whether stock firmware works.
+    validations:
+      required: true
   - type: textarea
-    id: behaviour
+    id: logs
     attributes:
-      label: Actual behaviour
-      description: A clear and concise description of what actually happens.
-  - type: textarea
-    id: expected
-    attributes:
-      label: Expected behaviour
-      description: A clear and concise description of what you expected to happen.
-  - type: textarea
-    id: additional
-    attributes:
-      label: Additional info
-      description: Add any additional info you think might be helfpul.
-  - type: textarea
-    id: diffconfig
-    attributes:
-      label: Diffconfig
-      description: |
-        In case of a self-built image, please attach diffconfig.
-        ```./scripts/diffconfig.sh```
+      label: Logs and configuration
+      description: Relevant dmesg, logread, serial output, boot.env and local build changes. Remove passwords and other private information.
       render: text
-  - type: checkboxes
-    id: terms
+  - type: input
+    id: peripherals
     attributes:
-      label: Terms
-      description: By submitting this issue, you agree to the terms below.
-      options:
-        - label: I am reporting an issue for OpenWrt, not an unsupported fork.
-          required: true
+      label: Connected peripherals
+      description: For USB/network issues, include adapter chipset, host OS, cable and USB port.
