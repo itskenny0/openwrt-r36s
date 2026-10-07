@@ -3,7 +3,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=mesa-rk3326
 PKG_VERSION:=24.3.4
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 PKG_SOURCE:=mesa-$(PKG_VERSION).tar.xz
 PKG_SOURCE_URL:=https://archive.mesa3d.org/
 PKG_HASH:=e641ae27191d387599219694560d221b7feaa91c900bcec46bf444218ed66025
@@ -22,7 +22,7 @@ include $(INCLUDE_DIR)/meson.mk
 MESON_VARS += PYTHONPATH="$(HOST_PYTHON3PATH)"
 MESON_ARGS += \
 	-Ddefault_library=shared \
-	-Dgallium-drivers=panfrost -Dvulkan-drivers= -Dplatforms= \
+	-Dgallium-drivers=panfrost,softpipe -Dvulkan-drivers= -Dplatforms= \
 	-Dllvm=disabled -Dshared-llvm=disabled -Dglx=disabled -Dglvnd=disabled \
 	-Dopengl=true -Dgles1=enabled -Dgles2=enabled -Degl=enabled -Dgbm=enabled \
 	-Dgallium-vdpau=disabled -Dgallium-va=disabled -Dgallium-xa=disabled \

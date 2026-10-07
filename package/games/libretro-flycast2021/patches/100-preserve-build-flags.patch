@@ -1,0 +1,18 @@
+--- a/Makefile
++++ b/Makefile
+@@ -45,12 +45,12 @@
+ 
+ MFLAGS   := 
+ ASFLAGS  := 
+-LDFLAGS  :=
++LDFLAGS  ?=
+ LDFLAGS_END :=
+ INCFLAGS :=
+ LIBS     :=
+-CFLAGS   := 
+-CXXFLAGS :=
++CFLAGS   ?=
++CXXFLAGS ?=
+ 
+ GIT_VERSION := " $(shell git rev-parse --short HEAD || echo unknown)"
+ ifneq ($(GIT_VERSION)," unknown")

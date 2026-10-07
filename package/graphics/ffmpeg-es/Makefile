@@ -2,11 +2,11 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=ffmpeg-es
-PKG_VERSION:=7.1.1
+PKG_VERSION:=7.1.5
 PKG_RELEASE:=1
 PKG_SOURCE:=ffmpeg-$(PKG_VERSION).tar.xz
 PKG_SOURCE_URL:=https://ffmpeg.org/releases/
-PKG_HASH:=733984395e0dbbe5c046abda2dc49a5544e7e0e1e2366bba849222ae9e3a03b1
+PKG_HASH:=de668509caf9e35e3cd162473441fdb29538c6d96ed080292b3cf9e6fc5d558f
 PKG_BUILD_DIR:=$(BUILD_DIR)/ffmpeg-$(PKG_VERSION)
 PKG_LICENSE:=LGPL-2.1-or-later
 PKG_LICENSE_FILES:=COPYING.LGPLv2.1
@@ -26,13 +26,13 @@ endef
 CONFIGURE_ARGS := --prefix=/usr --target-os=linux --arch=aarch64 \
 	--enable-cross-compile --cross-prefix=$(TARGET_CROSS) \
 	--cc="$(TARGET_CC)" --cxx="$(TARGET_CXX)" --pkg-config=$(STAGING_DIR_HOST)/bin/pkg-config \
-	--extra-cflags="$(TARGET_CFLAGS) $(TARGET_CPPFLAGS)" --extra-ldflags="$(TARGET_LDFLAGS)" \
+	--extra-cflags="$(TARGET_CFLAGS) $(TARGET_CPPFLAGS)" --extra-ldflags="$(TARGET_LDFLAGS) -Wl,--no-undefined" \
 	--disable-autodetect --disable-static --enable-shared --enable-pic \
 	--disable-programs --disable-doc --disable-debug --disable-everything \
 	--enable-avcodec --enable-avformat --enable-avutil --enable-swscale --enable-swresample \
-	--enable-decoder=h264,mpeg4,mpeg2video,mjpeg,png,vp8,vp9,aac,mp3,vorbis,flac,pcm_s16le \
-	--enable-demuxer=mov,matroska,avi,ogg,mp3,wav,image2 \
-	--enable-parser=h264,mpeg4video,mpegaudio,aac,vp8,vp9 \
+	--enable-decoder=h264,mpeg4,mpeg2video,mjpeg,mjpegb,png,vp8,vp9,aac,aac_latm,atrac3,atrac3p,mp3,vorbis,flac,pcm_s16le,pcm_s8 \
+	--enable-demuxer=mov,matroska,avi,ogg,mp3,wav,image2,h264,m4v,mpegvideo,mpegps,aac,pmp,oma,pcm_s16le,pcm_s8 \
+	--enable-parser=h264,mpeg4video,mpegaudio,mpegvideo,aac,aac_latm,vp8,vp9 \
 	--enable-protocol=file --enable-zlib --enable-pthreads --disable-avdevice --disable-avfilter
 
 # FFmpeg's linker rules pass compiler-driver options, not raw ld arguments.

@@ -1,0 +1,22 @@
+--- a/core/deps/libzip/mkstemp.c
++++ b/core/deps/libzip/mkstemp.c
+@@ -43,7 +43,7 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ 
+-#ifdef __APPLE__
++#ifndef _WIN32
+ #include <unistd.h>
+ #endif
+ 
+--- a/core/deps/libzip/zip_close.c
++++ b/core/deps/libzip/zip_close.c
+@@ -42,7 +42,7 @@
+ 
+ #include "zipint.h"
+ 
+-#ifdef __APPLE__
++#ifndef _WIN32
+ #include <unistd.h>
+ #endif
+ 
