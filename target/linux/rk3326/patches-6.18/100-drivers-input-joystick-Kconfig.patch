@@ -1,0 +1,50 @@
+diff --git a/drivers/input/joystick/Kconfig b/drivers/input/joystick/Kconfig
+index 7755e5b..7249981 100644
+--- a/drivers/input/joystick/Kconfig
++++ b/drivers/input/joystick/Kconfig
+@@ -400,6 +400,36 @@ config JOYSTICK_N64
+ 	  Say Y here if you want enable support for the four
+ 	  built-in controller ports on the Nintendo 64 console.
+ 
++config JOYSTICK_ODROIDGO2
++	tristate "ODROIDGO2-Advance joypad driver"
++	help
++	  Made for ODROIDGO2-Advance.
++
++config JOYSTICK_ODROIDGO2_V11
++        tristate "ODROIDGO2-Advance joypad driver"
++        help
++          Made for ODROIDGO2-Advance.
++
++config JOYSTICK_ODROIDGO3
++	tristate "ODROIDGO3 joypad driver"
++	help
++	  Made for ODROIDGO3.
++
++config JOYSTICK_RGB20S
++        tristate "RGB20S joypad driver"
++        help
++          Made for RGB20S.
++
++config JOYSTICK_XU10
++        tristate "XU10 joypad driver"
++        help
++          Made for XU10.
++
++config JOYSTICK_GAMEFORCE_CHI
++	tristate "gameforce joypad driver"
++	help
++	  Made for Gameforce CHI.
++
+ config JOYSTICK_SENSEHAT
+ 	tristate "Raspberry Pi Sense HAT joystick"
+ 	depends on INPUT && I2C
+@@ -423,3 +453,8 @@ config JOYSTICK_SEESAW
+ 	  called adafruit-seesaw.
+ 
+ endif
++
++config JOYSTICK_ROCKNIX
++	tristate "ROCKNIX handheld joypads"
++	depends on OF && IIO && GPIOLIB && PWM
++	select INPUT_POLLDEV

@@ -1,0 +1,71 @@
+diff --git a/drivers/input/misc/pwm-vibra.c b/drivers/input/misc/pwm-vibra.c
+index 3e5ed68..6fedfe5 100644
+--- a/drivers/input/misc/pwm-vibra.c
++++ b/drivers/input/misc/pwm-vibra.c
+@@ -11,6 +11,7 @@
+  *  Copyright (C) 2010, Lars-Peter Clausen <lars@metafoo.de>
+  */
+ 
++#include <linux/delay.h>
+ #include <linux/gpio/consumer.h>
+ #include <linux/input.h>
+ #include <linux/kernel.h>
+@@ -20,6 +21,7 @@
+ #include <linux/property.h>
+ #include <linux/pwm.h>
+ #include <linux/regulator/consumer.h>
++#include <linux/rockchip/cpu.h>
+ #include <linux/slab.h>
+ 
+ struct pwm_vibrator {
+@@ -129,7 +131,7 @@ static int pwm_vibrator_probe(struct platform_device *pdev)
+ {
+ 	struct pwm_vibrator *vibrator;
+ 	struct pwm_state state;
+-	int err;
++	int err, i;
+ 
+ 	vibrator = devm_kzalloc(&pdev->dev, sizeof(*vibrator), GFP_KERNEL);
+ 	if (!vibrator)
+@@ -157,9 +159,40 @@ static int pwm_vibrator_probe(struct platform_device *pdev)
+ 
+ 	INIT_WORK(&vibrator->play_work, pwm_vibrator_play_work);
+ 
+-	/* Sync up PWM state and ensure it is off. */
+ 	pwm_init_state(vibrator->pwm, &state);
++
++	if (soc_is_px30s()) {
++		/*
++		 * This channel can power up already latched in a stuck-on
++		 * state (enabled, 100% duty) that a plain disable never
++		 * clears - the very first transition away from that
++		 * boot-inherited state needs a real, substantial duty change
++		 * to actually take hold in hardware. Ramp down from 90% duty
++		 * (skipping the redundant 100% step, since that's already
++		 * where the boot-inherited state sits) to 0% over a fixed
++		 * 250ms before disabling - long enough to hold on any
++		 * board's period, gradual enough to feel like a deliberate
++		 * fade rather than an abrupt jolt. Scoped to PX30S, the only
++		 * silicon variant confirmed to hit this symptom (GKD
++		 * Pixel 2) - other boards using this driver keep the plain
++		 * disable below unchanged.
++		 */
++		state.enabled = true;
++		for (i = 0; i < 10; i++) {
++			state.duty_cycle = state.period * (9 - i) / 10;
++			err = pwm_apply_might_sleep(vibrator->pwm, &state);
++			if (err) {
++				dev_err(&pdev->dev,
++					"failed to kick pwm state: %d\n",
++					err);
++				return err;
++			}
++			msleep(25);
++		}
++	}
++
+ 	state.enabled = false;
++	state.duty_cycle = 0;
+ 	err = pwm_apply_might_sleep(vibrator->pwm, &state);
+ 	if (err) {
+ 		dev_err(&pdev->dev, "failed to apply initial PWM state: %d\n",

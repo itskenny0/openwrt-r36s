@@ -1,0 +1,44 @@
+diff --git a/drivers/usb/dwc2/core.h b/drivers/usb/dwc2/core.h
+index 34127b8..c5dc841 100644
+--- a/drivers/usb/dwc2/core.h
++++ b/drivers/usb/dwc2/core.h
+@@ -875,6 +875,7 @@ struct dwc2_hregs_backup {
+  * @reset_phy_on_wake:	Quirk saying that we should assert PHY reset on a
+  *			remote wakeup.
+  * @phy_off_for_suspend: Status of whether we turned the PHY off at suspend.
++ * @core_reset_failed:	Set when the last core soft reset timed out.
+  * @need_phy_for_wake:	Quirk saying that we should keep the PHY on at
+  *			suspend if we need USB to wake us up.
+  * @frame_number:       Frame number read from the core. For both device
+@@ -1073,6 +1074,7 @@ struct dwc2_hsotg {
+ 	unsigned int reset_phy_on_wake:1;
+ 	unsigned int need_phy_for_wake:1;
+ 	unsigned int phy_off_for_suspend:1;
++	unsigned int core_reset_failed:1;
+ 	u16 frame_number;
+ 
+ 	struct phy *phy;
+@@ -1080,6 +1082,7 @@ struct dwc2_hsotg {
+ 	struct dwc2_hsotg_plat *plat;
+ 	struct regulator_bulk_data supplies[DWC2_NUM_SUPPLIES];
+ 	struct regulator *vbus_supply;
++	bool vbus_supply_enabled;
+ 	struct regulator *usb33d;
+ 
+ 	spinlock_t lock;
+@@ -1503,6 +1506,7 @@ int dwc2_hcd_get_frame_number(struct dwc2_hsotg *hsotg);
+ int dwc2_hcd_get_future_frame_number(struct dwc2_hsotg *hsotg, int us);
+ void dwc2_hcd_connect(struct dwc2_hsotg *hsotg);
+ void dwc2_hcd_disconnect(struct dwc2_hsotg *hsotg, bool force);
++void dwc2_hcd_vbus_supply_exit(struct dwc2_hsotg *hsotg);
+ void dwc2_hcd_start(struct dwc2_hsotg *hsotg);
+ int dwc2_core_init(struct dwc2_hsotg *hsotg, bool initial_setup);
+ int dwc2_port_suspend(struct dwc2_hsotg *hsotg, u16 windex);
+@@ -1530,6 +1534,7 @@ static inline int dwc2_hcd_get_future_frame_number(struct dwc2_hsotg *hsotg,
+ { return 0; }
+ static inline void dwc2_hcd_connect(struct dwc2_hsotg *hsotg) {}
+ static inline void dwc2_hcd_disconnect(struct dwc2_hsotg *hsotg, bool force) {}
++static inline void dwc2_hcd_vbus_supply_exit(struct dwc2_hsotg *hsotg) {}
+ static inline void dwc2_hcd_start(struct dwc2_hsotg *hsotg) {}
+ static inline void dwc2_hcd_remove(struct dwc2_hsotg *hsotg) {}
+ static inline int dwc2_core_init(struct dwc2_hsotg *hsotg, bool initial_setup)

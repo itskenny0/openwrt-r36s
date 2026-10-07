@@ -1,0 +1,12 @@
+diff --git a/drivers/soc/rockchip/Makefile b/drivers/soc/rockchip/Makefile
+index 23d4144..07b4bd3 100644
+--- a/drivers/soc/rockchip/Makefile
++++ b/drivers/soc/rockchip/Makefile
+@@ -3,5 +3,7 @@
+ # Rockchip Soc drivers
+ #
+ obj-$(CONFIG_ROCKCHIP_GRF) += grf.o
++obj-$(CONFIG_ROCKCHIP_CPUINFO) += rockchip-cpuinfo.o
++obj-$(CONFIG_ROCKCHIP_PM_CONFIG) += rockchip-pm-config.o
+ obj-$(CONFIG_ROCKCHIP_IODOMAIN) += io-domain.o
+ obj-$(CONFIG_ROCKCHIP_DTPM) += dtpm.o

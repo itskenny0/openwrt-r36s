@@ -1,0 +1,22 @@
+diff --git a/drivers/usb/dwc2/gadget.c b/drivers/usb/dwc2/gadget.c
+index 8282de6..ebb870b 100644
+--- a/drivers/usb/dwc2/gadget.c
++++ b/drivers/usb/dwc2/gadget.c
+@@ -5261,7 +5261,7 @@ int dwc2_restore_device_registers(struct dwc2_hsotg *hsotg, unsigned int flags)
+ 		 * as result BNA interrupt asserted on hibernation exit
+ 		 * by restoring from saved area.
+ 		 */
+-		if (using_desc_dma(hsotg) &&
++		if (using_desc_dma(hsotg) && hsotg->eps_in[i] &&
+ 		    (dr->diepctl[i] & DXEPCTL_EPENA))
+ 			dr->diepdma[i] = hsotg->eps_in[i]->desc_list_dma;
+ 		dwc2_writel(hsotg, dr->dtxfsiz[i], DPTXFSIZN(i));
+@@ -5273,7 +5273,7 @@ int dwc2_restore_device_registers(struct dwc2_hsotg *hsotg, unsigned int flags)
+ 		 * as result BNA interrupt asserted on hibernation exit
+ 		 * by restoring from saved area.
+ 		 */
+-		if (using_desc_dma(hsotg) &&
++		if (using_desc_dma(hsotg) && hsotg->eps_out[i] &&
+ 		    (dr->doepctl[i] & DXEPCTL_EPENA))
+ 			dr->doepdma[i] = hsotg->eps_out[i]->desc_list_dma;
+ 		dwc2_writel(hsotg, dr->doepdma[i], DOEPDMA(i));

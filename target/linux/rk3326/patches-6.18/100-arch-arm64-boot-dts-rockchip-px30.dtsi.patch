@@ -1,0 +1,23 @@
+diff --git a/arch/arm64/boot/dts/rockchip/px30.dtsi b/arch/arm64/boot/dts/rockchip/px30.dtsi
+index 46f64cd..09fbd37 100644
+--- a/arch/arm64/boot/dts/rockchip/px30.dtsi
++++ b/arch/arm64/boot/dts/rockchip/px30.dtsi
+@@ -822,6 +822,18 @@ performance: performance@1e {
+ 		};
+ 	};
+ 
++	/*
++	 * Distinguishes PX30 from PX30S at runtime (same base compatible,
++	 * different DPHY/pinctrl/thermal/OTP silicon revision) - see
++	 * drivers/soc/rockchip/rockchip-cpuinfo.c, ported from the vendor
++	 * kernel's 84d26633c7a4 ("soc: rockchip: add cpuid for px30/px30s").
++	 */
++	cpuinfo {
++		compatible = "rockchip,cpuinfo";
++		nvmem-cells = <&cpu_id>;
++		nvmem-cell-names = "id";
++	};
++
+ 	cru: clock-controller@ff2b0000 {
+ 		compatible = "rockchip,px30-cru";
+ 		reg = <0x0 0xff2b0000 0x0 0x1000>;

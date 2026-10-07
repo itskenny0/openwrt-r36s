@@ -38,7 +38,7 @@ $(eval $(call KernelPackage,bluetooth))
 define KernelPackage/hci-uart
   SUBMENU:=$(BLUETOOTH_MENU)
   TITLE:=Bluetooth HCI UART support
-  DEPENDS:=+kmod-bluetooth
+  DEPENDS:=+kmod-bluetooth +TARGET_rk3326:kmod-btusb
   KCONFIG:= \
 	CONFIG_BT_HCIUART \
 	CONFIG_BT_HCIUART_BCM=n \
@@ -55,6 +55,20 @@ define KernelPackage/hci-uart/description
 endef
 
 $(eval $(call KernelPackage,hci-uart))
+
+
+define KernelPackage/hci-uart-rtl
+  SUBMENU:=$(BLUETOOTH_MENU)
+  TITLE:=Realtek Bluetooth HCI UART support
+  # btusb provides the shared btrtl module used by the UART protocol.
+  DEPENDS:=@TARGET_rk3326 +kmod-hci-uart +kmod-btusb +rtl8723ds-bt-firmware
+  KCONFIG:= \
+	CONFIG_BT_HCIUART_SERDEV=y \
+	CONFIG_BT_HCIUART_3WIRE=y \
+	CONFIG_BT_HCIUART_RTL=y
+endef
+
+$(eval $(call KernelPackage,hci-uart-rtl))
 
 
 define KernelPackage/btusb

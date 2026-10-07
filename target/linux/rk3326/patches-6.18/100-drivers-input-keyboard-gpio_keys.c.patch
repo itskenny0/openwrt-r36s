@@ -1,0 +1,15 @@
+diff --git a/drivers/input/keyboard/gpio_keys.c b/drivers/input/keyboard/gpio_keys.c
+index f9db86d..582372a 100644
+--- a/drivers/input/keyboard/gpio_keys.c
++++ b/drivers/input/keyboard/gpio_keys.c
+@@ -884,8 +884,8 @@ static int gpio_keys_probe(struct platform_device *pdev)
+ 
+ 	input->id.bustype = BUS_HOST;
+ 	input->id.vendor = 0x0001;
+-	input->id.product = 0x0001;
+-	input->id.version = 0x0100;
++	input->id.product = 0x7891;
++	input->id.version = 0x0500;
+ 
+ 	input->keycode = ddata->keymap;
+ 	input->keycodesize = sizeof(ddata->keymap[0]);

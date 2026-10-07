@@ -1,0 +1,164 @@
+diff --git a/drivers/clk/rockchip/clk-px30.c b/drivers/clk/rockchip/clk-px30.c
+index caf7c0e..844de2d 100644
+--- a/drivers/clk/rockchip/clk-px30.c
++++ b/drivers/clk/rockchip/clk-px30.c
+@@ -8,6 +8,7 @@
+ #include <linux/io.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/rockchip/cpu.h>
+ #include <linux/syscore_ops.h>
+ #include <dt-bindings/clock/px30-cru.h>
+ #include "clk.h"
+@@ -145,6 +146,7 @@ PNAME(mux_npll_cpll_p)		= { "npll", "cpll" };
+ PNAME(mux_gpll_cpll_p)		= { "gpll", "dummy_cpll" };
+ PNAME(mux_gpll_npll_p)		= { "gpll", "npll" };
+ PNAME(mux_gpll_xin24m_p)		= { "gpll", "xin24m"};
++PNAME(mux_xin24m_gpll_p)		= { "xin24m", "gpll"};
+ PNAME(mux_gpll_cpll_npll_p)		= { "gpll", "dummy_cpll", "npll" };
+ PNAME(mux_gpll_cpll_npll_xin24m_p)	= { "gpll", "dummy_cpll", "npll", "xin24m" };
+ PNAME(mux_gpll_xin24m_npll_p)		= { "gpll", "xin24m", "npll"};
+@@ -335,12 +337,6 @@ static struct rockchip_clk_branch px30_clk_branches[] __initdata = {
+ 			PX30_CLKGATE_CON(0), 13, GFLAGS),
+ 	COMPOSITE_NOGATE(SCLK_DDRCLK, "sclk_ddrc", mux_ddrphy_p, CLK_IGNORE_UNUSED,
+ 			PX30_CLKSEL_CON(2), 7, 1, MFLAGS, 0, 3, DFLAGS | CLK_DIVIDER_POWER_OF_TWO),
+-	COMPOSITE_NOGATE(0, "clk_ddrphy4x", mux_ddrphy_p, CLK_IGNORE_UNUSED,
+-			PX30_CLKSEL_CON(2), 7, 1, MFLAGS, 0, 3, DFLAGS),
+-	FACTOR_GATE(0, "clk_ddrphy1x", "clk_ddrphy4x", CLK_IGNORE_UNUSED, 1, 4,
+-			PX30_CLKGATE_CON(0), 14, GFLAGS),
+-	FACTOR_GATE(0, "clk_stdby_2wrap", "clk_ddrphy4x", CLK_IGNORE_UNUSED, 1, 4,
+-			PX30_CLKGATE_CON(1), 0, GFLAGS),
+ 	COMPOSITE_NODIV(0, "clk_ddrstdby", mux_ddrstdby_p, CLK_IGNORE_UNUSED,
+ 			PX30_CLKSEL_CON(2), 4, 1, MFLAGS,
+ 			PX30_CLKGATE_CON(1), 13, GFLAGS),
+@@ -767,12 +763,6 @@ static struct rockchip_clk_branch px30_clk_branches[] __initdata = {
+ 	COMPOSITE_NOMUX(SCLK_SARADC, "clk_saradc", "xin24m", 0,
+ 			PX30_CLKSEL_CON(55), 0, 11, DFLAGS,
+ 			PX30_CLKGATE_CON(12), 10, GFLAGS),
+-	COMPOSITE_NOMUX(SCLK_OTP, "clk_otp", "xin24m", 0,
+-			PX30_CLKSEL_CON(56), 0, 3, DFLAGS,
+-			PX30_CLKGATE_CON(12), 11, GFLAGS),
+-	COMPOSITE_NOMUX(SCLK_OTP_USR, "clk_otp_usr", "clk_otp", 0,
+-			PX30_CLKSEL_CON(56), 4, 2, DFLAGS,
+-			PX30_CLKGATE_CON(13), 6, GFLAGS),
+ 
+ 	GATE(0, "clk_cpu_boost", "xin24m", CLK_IGNORE_UNUSED,
+ 			PX30_CLKGATE_CON(12), 12, GFLAGS),
+@@ -999,6 +989,85 @@ static const char *const px30_cru_critical_clocks[] __initconst = {
+ 	"pclk_usb_grf",
+ };
+ 
++static struct rockchip_clk_branch px30_clk_ddrphy_otp[] __initdata = {
++	COMPOSITE_NOGATE(0, "clk_ddrphy4x", mux_ddrphy_p, CLK_IGNORE_UNUSED,
++			PX30_CLKSEL_CON(2), 7, 1, MFLAGS, 0, 3, DFLAGS),
++	FACTOR_GATE(0, "clk_ddrphy1x", "clk_ddrphy4x", CLK_IGNORE_UNUSED, 1, 4,
++			PX30_CLKGATE_CON(0), 14, GFLAGS),
++	FACTOR_GATE(0, "clk_stdby_2wrap", "clk_ddrphy4x",
++			CLK_IGNORE_UNUSED, 1, 4,
++			PX30_CLKGATE_CON(1), 0, GFLAGS),
++
++	COMPOSITE_NOMUX(SCLK_OTP, "clk_otp", "xin24m", 0,
++			PX30_CLKSEL_CON(56), 0, 3, DFLAGS,
++			PX30_CLKGATE_CON(12), 11, GFLAGS),
++	COMPOSITE_NOMUX(SCLK_OTP_USR, "clk_otp_usr", "clk_otp", 0,
++			PX30_CLKSEL_CON(56), 4, 2, DFLAGS,
++			PX30_CLKGATE_CON(13), 6, GFLAGS),
++};
++
++static struct rockchip_clk_branch px30s_clk_ddrphy_otp[] __initdata = {
++	COMPOSITE(0, "clk_ddrphy1x", mux_ddrphy_p, CLK_IGNORE_UNUSED,
++			PX30_CLKSEL_CON(2), 7, 1, MFLAGS, 0, 3, DFLAGS,
++			PX30_CLKGATE_CON(0), 14, GFLAGS),
++	FACTOR_GATE(0, "clk_stdby_2wrap", "clk_ddrphy1x",
++			CLK_IGNORE_UNUSED, 1, 4,
++			PX30_CLKGATE_CON(1), 0, GFLAGS),
++
++	COMPOSITE(SCLK_OTP_USR, "clk_otp_usr", mux_xin24m_gpll_p, 0,
++			PX30_CLKSEL_CON(56), 8, 1, MFLAGS, 0, 8, DFLAGS,
++			PX30_CLKGATE_CON(12), 11, GFLAGS),
++};
++
++static void __iomem *px30_cru_base;
++
++/*
++ * PX30_MODE_CON (PLL slow/normal mode select) and PX30_CLKSEL_CON(0)
++ * (the armclk/CPU-core divider) are reset across suspend/resume on
++ * this SoC, the same way rk3288's equivalent CRU registers are reset
++ * by maskrom on that chip - see rk3288_clk_suspend()/rk3288_clk_resume()
++ * in clk-rk3288.c for the precedent this is modeled on. Save them
++ * before suspend, restore them after resume.
++ */
++static const int px30_saved_cru_reg_ids[] = {
++	PX30_MODE_CON,
++	PX30_CLKSEL_CON(0),
++};
++
++static u32 px30_saved_cru_regs[ARRAY_SIZE(px30_saved_cru_reg_ids)];
++
++static int px30_clk_suspend(void *data)
++{
++	int i, reg_id;
++
++	for (i = 0; i < ARRAY_SIZE(px30_saved_cru_reg_ids); i++) {
++		reg_id = px30_saved_cru_reg_ids[i];
++		px30_saved_cru_regs[i] = readl_relaxed(px30_cru_base + reg_id);
++	}
++
++	return 0;
++}
++
++static void px30_clk_resume(void *data)
++{
++	int i, reg_id;
++
++	for (i = ARRAY_SIZE(px30_saved_cru_reg_ids) - 1; i >= 0; i--) {
++		reg_id = px30_saved_cru_reg_ids[i];
++		writel_relaxed(px30_saved_cru_regs[i] | 0xffff0000,
++			       px30_cru_base + reg_id);
++	}
++}
++
++static const struct syscore_ops px30_clk_syscore_ops = {
++	.suspend = px30_clk_suspend,
++	.resume = px30_clk_resume,
++};
++
++static struct syscore px30_clk_syscore = {
++	.ops = &px30_clk_syscore_ops,
++};
++
+ static void __init px30_clk_init(struct device_node *np)
+ {
+ 	struct rockchip_clk_provider *ctx;
+@@ -1010,6 +1079,7 @@ static void __init px30_clk_init(struct device_node *np)
+ 		pr_err("%s: could not map cru region\n", __func__);
+ 		return;
+ 	}
++	px30_cru_base = reg_base;
+ 
+ 	clk_nr_clks = rockchip_clk_find_max_clk_id(px30_clk_branches,
+ 						   ARRAY_SIZE(px30_clk_branches)) + 1;
+@@ -1026,6 +1096,14 @@ static void __init px30_clk_init(struct device_node *np)
+ 	rockchip_clk_register_branches(ctx, px30_clk_branches,
+ 				       ARRAY_SIZE(px30_clk_branches));
+ 
++	rockchip_soc_id_init();
++	if (soc_is_px30s())
++		rockchip_clk_register_branches(ctx, px30s_clk_ddrphy_otp,
++					       ARRAY_SIZE(px30s_clk_ddrphy_otp));
++	else
++		rockchip_clk_register_branches(ctx, px30_clk_ddrphy_otp,
++					       ARRAY_SIZE(px30_clk_ddrphy_otp));
++
+ 	rockchip_clk_register_armclk(ctx, ARMCLK, "armclk",
+ 				     mux_armclk_p, ARRAY_SIZE(mux_armclk_p),
+ 				     &px30_cpuclk_data, px30_cpuclk_rates,
+@@ -1039,6 +1117,8 @@ static void __init px30_clk_init(struct device_node *np)
+ 
+ 	rockchip_register_restart_notifier(ctx, PX30_GLB_SRST_FST, NULL);
+ 
++	register_syscore(&px30_clk_syscore);
++
+ 	rockchip_clk_of_add_provider(np, ctx);
+ }
+ CLK_OF_DECLARE(px30_cru, "rockchip,px30-cru", px30_clk_init);

@@ -25,6 +25,12 @@ define Trusted-Firmware-A/Default
   BUILD_TARGET:=rockchip
 endef
 
+define Trusted-Firmware-A/rk3326
+  BUILD_TARGET:=rk3326
+  ATF:=rk33/rk3326_bl31_v1.34.elf
+  TPL:=rk33/rk3326_ddr_333MHz_v2.11.bin
+endef
+
 define Trusted-Firmware-A/rk3308
   BUILD_SUBTARGET:=armv8
   ATF:=rk33/rk3308_bl31_v2.27.elf
@@ -74,6 +80,7 @@ define Trusted-Firmware-A/rk3588-tpl
 endef
 
 TFA_TARGETS:= \
+	rk3326 \
 	rk3308 \
 	rk3308-tpl-rock-pi-s \
 	rk3528 \
@@ -120,11 +127,17 @@ endef
 
 define Package/trusted-firmware-a/install
 	$(INSTALL_DIR) $(STAGING_DIR_IMAGE)
-
-ifneq ($(ATF),)
-	$(CP) $(PKG_BUILD_DIR)/bin/$(ATF) $(STAGING_DIR_IMAGE)/
-endif
+	$(if $(ATF),$(CP) $(PKG_BUILD_DIR)/bin/$(ATF) $(STAGING_DIR_IMAGE)/)
 	$(CP) $(PKG_BUILD_DIR)/bin/$(TPL) $(STAGING_DIR_IMAGE)/
+	$(if $(filter rk3326,$(BUILD_VARIANT)),
+		$(INSTALL_DIR) $(STAGING_DIR_IMAGE)/rk3326
+		$(CP) $(PKG_BUILD_DIR)/bin/rk33/rk3326_miniloader_v1.40.bin $(STAGING_DIR_IMAGE)/rk3326/
+		$(CP) $(PKG_BUILD_DIR)/bin/$(ATF) $(PKG_BUILD_DIR)/bin/$(TPL) $(STAGING_DIR_IMAGE)/rk3326/
+		$(CP) $(PKG_BUILD_DIR)/tools/loaderimage $(PKG_BUILD_DIR)/tools/trust_merger $(STAGING_DIR_IMAGE)/rk3326/
+		$(CP) $(PKG_BUILD_DIR)/bin/$(TPL) $(STAGING_DIR_IMAGE)/rk3326/rk3326_ddr_uart5.bin
+		python3 $(PKG_BUILD_DIR)/tools/ddrbin_tool.py rk3326 -g $(PKG_BUILD_DIR)/uart5.txt $(STAGING_DIR_IMAGE)/rk3326/rk3326_ddr_uart5.bin
+		sed -i 's|uart id=.*|uart id=5|' $(PKG_BUILD_DIR)/uart5.txt
+		python3 $(PKG_BUILD_DIR)/tools/ddrbin_tool.py rk3326 $(PKG_BUILD_DIR)/uart5.txt $(STAGING_DIR_IMAGE)/rk3326/rk3326_ddr_uart5.bin)
 endef
 
 $(eval $(call BuildPackage/Trusted-Firmware-A))

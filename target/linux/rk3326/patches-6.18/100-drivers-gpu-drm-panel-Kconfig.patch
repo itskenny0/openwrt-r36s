@@ -1,0 +1,12 @@
+diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
+index 967265e..0f2d5c1 100644
+--- a/drivers/gpu/drm/panel/Kconfig
++++ b/drivers/gpu/drm/panel/Kconfig
+@@ -1172,3 +1172,7 @@ config DRM_PANEL_XINPENG_XPP055C272
+ 	  XPP055C272 controller for 720x1280 LCD panels with MIPI/RGB/SPI
+ 	  system interfaces.
+ endmenu
++
++config DRM_PANEL_GENERIC_DSI
++	tristate "Generic MIPI DSI panel"
++	depends on OF && DRM_MIPI_DSI && BACKLIGHT_CLASS_DEVICE
