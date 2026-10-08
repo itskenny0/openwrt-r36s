@@ -231,7 +231,7 @@ else
 endif
 
 # Use the same archive tools before and during the build.
-download: .config FORCE $(if $(wildcard $(STAGING_DIR_HOST)/bin/flock),,tools/flock/compile) $(if $(wildcard $(STAGING_DIR_HOST)/bin/zstd),,tools/zstd/compile) $(if $(wildcard $(STAGING_DIR_HOST)/bin/tar),,tools/tar/compile)
+download: .config FORCE $(if $(wildcard $(STAGING_DIR_HOST)/bin/flock),,tools/flock/compile) $(if $(wildcard $(STAGING_DIR_HOST)/bin/zstd),,tools/zstd/compile) $(if $(wildcard $(STAGING_DIR_HOST)/stamp/.tar_installed),,tools/tar/compile)
 	@+set -e; $(foreach dir,$(DOWNLOAD_DIRS),$(SUBMAKE) $(dir);)
 
 clean dirclean: .config

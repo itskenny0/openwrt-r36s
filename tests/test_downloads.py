@@ -76,6 +76,25 @@ $(eval $(call Download,default))
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse((self.work / "continued").exists())
 
+    def test_download_builds_tar_despite_host_symlink(self):
+        stage = self.work / "staging"
+        (stage / "bin").mkdir(parents=True)
+        (stage / "bin/tar").symlink_to("/usr/bin/tar")
+        text = (ROOT / "include/toplevel.mk").read_text()
+        rule = re.search(r"^download:[^\n]+", text, re.M)[0]
+        (self.work / "Makefile").write_text(f"""STAGING_DIR_HOST:={stage}
+{rule}
+.config FORCE tools/flock/compile tools/zstd/compile: ;
+tools/tar/compile:
+\t@mkdir -p {stage}/stamp
+\t@touch {stage}/stamp/.tar_installed
+\t@echo built >> tar-builds
+""")
+        self.run_command("make", "--no-print-directory", "download")
+        self.assertTrue((stage / "stamp/.tar_installed").exists())
+        self.run_command("make", "--no-print-directory", "download")
+        self.assertEqual((self.work / "tar-builds").read_text().splitlines(), ["built"])
+
 
 if __name__ == "__main__":
     unittest.main()
