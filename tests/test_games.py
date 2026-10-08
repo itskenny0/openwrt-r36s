@@ -32,13 +32,21 @@ class LaunchTests(unittest.TestCase):
 import json, os, pathlib, signal, sys, time
 root = pathlib.Path(os.environ["FIXTURE"])
 (root / "arguments.json").write_text(json.dumps(sys.argv[1:]))
+(root / "emulator-pid").write_text(str(os.getpid()))
+stopping = 0
 def stop(signum, frame):
-    (root / "flushed").write_text("saved")
-    sys.exit(0)
+    global stopping
+    stopping += 1
+    if stopping > 1:
+        os._exit(1)
 signal.signal(signal.SIGTERM, stop)
 if os.environ.get("WAIT_FOR_STOP"):
     (root / "ready").touch()
-    while True: time.sleep(0.01)
+    while not stopping: time.sleep(0.01)
+    # Match RetroArch's deferred cleanup: a second signal forces exit before
+    # its normal main loop has finished writing cartridge RAM/save states.
+    time.sleep(0.2)
+    (root / "flushed").write_text("saved")
 sys.exit(int(os.environ.get("CORE_EXIT", 0)))
 ''', executable=True)
         for name in ("handheld-retroarch", "handheld-game-dirs"):
@@ -176,6 +184,10 @@ wait "$game" || wait "$game"
             if pidfile.exists():
                 try: os.killpg(int(pidfile.read_text()), signal.SIGKILL)
                 except ProcessLookupError: pass
+            pidfile = self.root / "emulator-pid"
+            if pidfile.exists():
+                try: os.kill(int(pidfile.read_text()), signal.SIGKILL)
+                except ProcessLookupError: pass
 
     def test_shutdown_waits_for_emulator_save_flush(self):
         env = dict(self.env, WAIT_FOR_STOP="1")
@@ -194,6 +206,10 @@ wait "$game" || wait "$game"
             if process.poll() is None:
                 process.kill()
                 process.wait()
+            pidfile = self.root / "emulator-pid"
+            if pidfile.exists():
+                try: os.kill(int(pidfile.read_text()), signal.SIGKILL)
+                except ProcessLookupError: pass
 
 
 if __name__ == "__main__":

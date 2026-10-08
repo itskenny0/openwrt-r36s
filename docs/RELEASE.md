@@ -1,6 +1,6 @@
 OpenWrt firmware for RK3326 handhelds, with EmulationStation, Panfrost, LuCI and a persistent USB Ethernet menu setting. The original R36S image defaults to Panel 4.
 
-This revision hardens upgrades against corrupt images and failed writes, forwards shutdown to running games, protects saves when a games card is missing, and adds persistent brightness/volume, volume buttons, automatic headphone routing and a two-second power hold for shutdown. Artwork decoding now uses SDL2_image with maintained PNG/JPEG/WebP libraries and bounded image dimensions. Hardware validation of these controls is pending.
+This revision hardens upgrades against corrupt images and failed writes, forwards shutdown to running games without duplicate signals that interrupt save flushing, protects saves when a games card is missing, and adds persistent brightness/volume, volume buttons, automatic headphone routing and a two-second power hold for shutdown. Artwork decoding now uses SDL2_image with maintained PNG/JPEG/WebP libraries and bounded image dimensions. Hardware validation of these controls is pending.
 
 USB Ethernet enables SSH, DHCP and LuCI. Fresh installations use `192.168.77.1`; upgrades retain the previous LAN address. USB Wi-Fi client provisioning is documented in `NETWORKING.md`.
 

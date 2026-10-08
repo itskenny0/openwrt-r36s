@@ -53,13 +53,16 @@ child=
 stop() {
 	trap '' TERM INT HUP
 	if [ -n "$child" ]; then
-		kill -TERM "$child" 2>/dev/null || true
+		kill -TERM "-$child" 2>/dev/null || kill -TERM "$child" 2>/dev/null || true
 		wait "$child" || true
 	fi
 	exit 0
 }
 trap stop TERM INT HUP
-/usr/bin/retroarch --config /etc/retroarch.cfg --appendconfig /tmp/handheld/retroarch-display.cfg \
+# The frontend supervisor signals its session as a group. Give the emulator
+# its own session so this launcher forwards that signal exactly once:
+# RetroArch treats a second signal as a forced exit before save cleanup.
+setsid /usr/bin/retroarch --config /etc/retroarch.cfg --appendconfig /tmp/handheld/retroarch-display.cfg \
 	-L "/usr/lib/libretro/${core}_libretro.so" "$rom" > /tmp/handheld/retroarch.log 2>&1 &
 child=$!
 status=0

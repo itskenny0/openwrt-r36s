@@ -63,6 +63,7 @@ jobs:
           python3 scripts/rk3326-check-kernel.py build_dir/target-*/linux-rk3326*/linux-6.18.*/.config
           python3 scripts/rk3326-check-images.py bin/targets/rk3326/generic
           python3 scripts/rk3326-smoke.py
+          python3 scripts/rk3326-shutdown-smoke.py
           python3 scripts/rk3326-upgrade-smoke.py
           sudo python3 scripts/rk3326-network-smoke.py
           python3 scripts/rk3326-ui-smoke.py
@@ -95,6 +96,7 @@ jobs:
             .work/ui-smoke/*.log
             .work/network-smoke/*.log
             .work/upgrade-smoke/*.log
+            .work/shutdown-smoke/*.log
           if-no-files-found: ignore
           retention-days: 14
       - name: Upload build diagnostics
