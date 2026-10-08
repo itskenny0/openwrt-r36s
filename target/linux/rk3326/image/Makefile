@@ -34,7 +34,8 @@ define Device/Default
   KERNEL_NAME := Image
   DEVICE_DTS_DIR := $(DTS_DIR)/rockchip
   DEVICE_DTS := $(RK3326_DTBS)
-  IMAGES := sysupgrade.img.gz
+  IMAGES := sdcard.img.gz sysupgrade.img.gz
+  IMAGE/sdcard.img.gz := rk3326-boot | rk3326-image | gzip
   IMAGE/sysupgrade.img.gz := rk3326-boot | rk3326-image | gzip | append-metadata
 endef
 

@@ -36,7 +36,7 @@ spec = importlib.util.spec_from_file_location('images', ROOT / 'scripts/rk3326-c
 images = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(images)
 disk = root / 'dev/mmcblk0'
-images.unpack_image(ROOT / 'bin/targets/rk3326/generic/openwrt-rk3326-generic-gameconsole_r36s-squashfs-sysupgrade.img.gz', disk)
+images.unpack_image(ROOT / 'bin/targets/rk3326/generic/openwrt-rk3326-generic-gameconsole_r36s-squashfs-sdcard.img.gz', disk, allow_trailer=False)
 with disk.open('r+b') as f:
     mbr = f.read(512)
     f.truncate(768 * 1024 * 1024)

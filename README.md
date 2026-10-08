@@ -14,7 +14,14 @@ This is a hardware bring-up port. CI builds and checks the firmware; a passing b
 
 ## Install
 
-Download the image matching your device from [Releases](https://github.com/itskenny0/openwrt-r36s/releases). For the original R36S Panel 4, choose the file containing `gameconsole_r36s`. Verify it against `SHA256SUMS`, then write the image to a spare microSD card with an image writer that supports `.img.gz`. Writing an image replaces that card's contents. Keep the original card for recovery.
+Download the image matching your device from [Releases](https://github.com/itskenny0/openwrt-r36s/releases):
+
+| Task | Download |
+| --- | --- |
+| Install onto a new microSD card | `*-sdcard.img.gz` |
+| Upgrade an existing installation through LuCI/sysupgrade | `*-sysupgrade.img.gz` |
+
+For the original R36S Panel 4, the fresh-install file is **`openwrt-rk3326-generic-gameconsole_r36s-squashfs-sdcard.img.gz`**. It includes the partition table, Rockchip boot firmware, boot partition and system filesystem. Verify it against `SHA256SUMS`, then write it to a spare microSD card with an image writer that supports `.img.gz`. If your writer requires `.img`, decompress the download first. Select the whole microSD card as the image writer's destination. Writing an image replaces that card's contents. Keep the original card for recovery.
 
 Put the card in the OS/TF1 slot. EmulationStation starts automatically. For other panels and clone hardware, follow [device and panel setup](docs/HARDWARE.md).
 

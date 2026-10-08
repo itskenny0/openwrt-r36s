@@ -16,7 +16,7 @@ make -j"$(nproc)"
 
 Use `./scripts/rk3326-configure.sh r36s` for just the original R36S Panel 4 image. The script resets `.config` to the tracked defaults. Run `make menuconfig` afterwards for local changes. Run only one build command at a time in a checkout; overlapping tools/toolchain builds can damage configure caches.
 
-Images and manifests appear in `bin/targets/rk3326/generic/`; binary packages appear in `bin/packages/`. These are complete SD images with boot firmware, a FAT boot partition and a squashfs root with writable ext4 overlay. The boot command explicitly selects ext4 for the overlay and the image includes its formatting tools.
+Images and manifests appear in `bin/targets/rk3326/generic/`; binary packages appear in `bin/packages/`. Each profile produces `*-sdcard.img.gz` for flashing a new card and `*-sysupgrade.img.gz` for updates. SD-card downloads contain a single standard gzip member with no sysupgrade metadata trailer. Both contain a complete disk layout with boot firmware, a FAT boot partition and a squashfs root with writable ext4 overlay. The boot command explicitly selects ext4 for the overlay and the image includes its formatting tools.
 
 The 32 MiB region before the first partition reserves Rockchip bootloader slots: DDR/miniloader at sector 64, U-Boot at sector 16384, and BL31 trust at sector 24576. The boot partition starts at 32 MiB and is 64 MiB. The root partition is 512 MiB and ends at 640 MiB. First boot adds an exFAT third partition covering the remaining card capacity; the downloadable image retains only its two fixed OS partitions. Every profile includes all available DTBs; its boot script selects the appropriate default.
 
@@ -39,7 +39,7 @@ python3 scripts/rk3326-ui-smoke.py
 
 Storage integration tests use real `sfdisk`, `mkfs.exfat` and `fsck.exfat` on disposable files, with kernel device registration and mounts simulated. They check first-boot layout, preservation of every OS byte, repeated boots, interrupted setup, existing volumes and refusal of unsafe layouts.
 
-The image check expects all profiles. It checks fwtool metadata, the gzip stream, partition bounds, bootloader slots, squashfs magic, the arm64 kernel, U-Boot script checksum and every DTB in the FAT filesystem. The kernel check inspects the resolved configuration and fails if a boot-critical driver became a module or was dropped. The firmware check reads the networking modules' compiled firmware filenames and requires the corresponding files and symlink targets in the final root filesystem.
+The image check requires both image types for all profiles. It rejects trailers or concatenated gzip members on SD-card images and requires fwtool metadata on sysupgrade images. It checks the gzip stream, partition bounds, bootloader slots, squashfs magic, the arm64 kernel, U-Boot script checksum and every DTB in the FAT filesystem. The kernel check inspects the resolved configuration and fails if a boot-critical driver became a module or was dropped. The firmware check reads the networking modules' compiled firmware filenames and requires the corresponding files and symlink targets in the final root filesystem.
 
 The storage smoke check runs the packaged ARM64 shell, OpenWrt UCI/functions, partitioner and exFAT tools against an enlarged copy of the R36S image; device registration, probing and mounting remain simulated. It verifies provisioning, retained filesystems after normal/reset boots and configuration migration.
 
@@ -74,7 +74,7 @@ After downloading an image, verify both its checksum and its [GitHub build attes
 
 ```sh
 sha256sum --ignore-missing -c SHA256SUMS
-gh attestation verify openwrt-rk3326-generic-gameconsole_r36s-squashfs-sysupgrade.img.gz \
+gh attestation verify openwrt-rk3326-generic-gameconsole_r36s-squashfs-sdcard.img.gz \
   --repo itskenny0/openwrt-r36s \
   --signer-workflow itskenny0/openwrt-r36s/.github/workflows/rk3326.yml
 ```

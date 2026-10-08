@@ -15,16 +15,25 @@ ROOT = Path(__file__).resolve().parents[1]
 MIB = 1024 * 1024
 
 
-def unpack_image(source, destination):
+def unpack_image(source, destination, allow_trailer=True):
     # OpenWrt appends fwtool metadata outside the gzip member.
     decoder = zlib.decompressobj(31)
     with source.open("rb") as src, destination.open("wb") as dst:
         while chunk := src.read(MIB):
             while chunk and not decoder.eof:
-                dst.write(decoder.decompress(chunk, MIB))
+                data = decoder.decompress(chunk, MIB)
+                # Keep image padding sparse while validating both downloads
+                # for every profile. Reads still return the original zeroes.
+                if data.strip(b"\0"):
+                    dst.write(data)
+                else:
+                    dst.seek(len(data), 1)
                 chunk = decoder.unconsumed_tail
             if decoder.eof:
+                if not allow_trailer and (decoder.unused_data or src.read(1)):
+                    raise ValueError(f"Unexpected data after gzip image: {source.name}")
                 break
+        dst.truncate()
     if not decoder.eof:
         raise ValueError(f"Truncated gzip stream: {source.name}")
 
@@ -52,10 +61,12 @@ def partitions(raw):
 
 
 def check_image(source, raw, mcopy, fwtool, dtbs, expected_dtb):
-    metadata = json.loads(subprocess.check_output([fwtool, "-i", "/dev/stdout", source]))
-    if not metadata.get("supported_devices"):
-        raise ValueError("Missing sysupgrade compatibility metadata")
-    unpack_image(source, raw)
+    sdcard = source.name.endswith("-sdcard.img.gz")
+    if not sdcard:
+        metadata = json.loads(subprocess.check_output([fwtool, "-i", "/dev/stdout", source]))
+        if not metadata.get("supported_devices"):
+            raise ValueError("Missing sysupgrade compatibility metadata")
+    unpack_image(source, raw, allow_trailer=not sdcard)
     boot, root = partitions(raw)
     with raw.open("rb") as image:
         for offset in (32768, 8 * MIB, 12 * MIB):
@@ -86,7 +97,7 @@ def check_image(source, raw, mcopy, fwtool, dtbs, expected_dtb):
         data = read_boot("dtbs/" + dtb)
         if data[:4] != b"\xd0\x0d\xfe\xed" or struct.unpack_from(">I", data, 4)[0] != len(data):
             raise ValueError(f"Invalid device tree: {dtb}")
-    print(f"Validated {source.name}: {selected[1].decode()}")
+    print(f"Validated {source.name}: {selected[1].decode()}", flush=True)
 
 
 def main():
@@ -112,13 +123,14 @@ def main():
         return profile_dtb(parent[1])
 
     dtbs = {p.stem + ".dtb" for p in (ROOT / "target/linux/rk3326/files/arch/arm64/boot/dts/rockchip").glob("*.dts")}
-    images = sorted(args.directory.glob("*-sysupgrade.img.gz"))
+    images = sorted(args.directory.glob("*.img.gz"))
     selected_images = {}
     for profile in profiles:
-        matches = [p for p in images if p.name.endswith(f"-{profile}-squashfs-sysupgrade.img.gz")]
-        if len(matches) != 1:
-            parser.error(f"Missing profile: {profile}")
-        selected_images[matches[0]] = profile_dtb(profile)
+        for kind in ("sdcard", "sysupgrade"):
+            matches = [p for p in images if p.name.endswith(f"-{profile}-squashfs-{kind}.img.gz")]
+            if len(matches) != 1:
+                parser.error(f"Missing {kind} image for profile: {profile}")
+            selected_images[matches[0]] = profile_dtb(profile)
     if len(images) != len(selected_images):
         parser.error("Unexpected extra images in release directory")
     workspace = ROOT / ".work"

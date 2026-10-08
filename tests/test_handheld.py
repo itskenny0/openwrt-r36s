@@ -7,6 +7,7 @@ import struct
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -186,11 +187,34 @@ class ImageTests(unittest.TestCase):
         images.unpack_image(self.gz, self.raw)
         self.assertEqual(self.raw.read_bytes(), data)
 
+    def test_sdcard_requires_a_clean_gzip_stream(self):
+        data = b"firmware" * 1000
+        compressor = zlib.compressobj(wbits=31)
+        member = compressor.compress(data) + compressor.flush()
+        self.gz.write_bytes(member)
+        images.unpack_image(self.gz, self.raw, allow_trailer=False)
+        self.assertEqual(self.raw.read_bytes(), data)
+        for boundary in (images.MIB, len(member)):
+            for trailer in (b"metadata", member):
+                with self.subTest(boundary=boundary, trailer_size=len(trailer)):
+                    self.gz.write_bytes(member + trailer)
+                    with patch.object(images, "MIB", boundary):
+                        with self.assertRaisesRegex(ValueError, "Unexpected data"):
+                            images.unpack_image(self.gz, self.raw, allow_trailer=False)
+
     def test_truncated_gzip_rejected(self):
         compressor = zlib.compressobj(wbits=31)
         self.gz.write_bytes((compressor.compress(b"firmware" * 100) + compressor.flush())[:-4])
         with self.assertRaisesRegex(ValueError, "Truncated"):
             images.unpack_image(self.gz, self.raw)
+
+    def test_zero_padding_preserves_disk_offsets_and_length(self):
+        data = bytes(3 * images.MIB) + b"partition" + bytes(images.MIB)
+        compressor = zlib.compressobj(wbits=31)
+        self.gz.write_bytes(compressor.compress(data) + compressor.flush())
+        images.unpack_image(self.gz, self.raw, allow_trailer=False)
+        self.assertEqual(self.raw.stat().st_size, len(data))
+        self.assertEqual(self.raw.read_bytes(), data)
 
     def make_mbr(self, root_start=96):
         mbr = bytearray(512)

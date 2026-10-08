@@ -1,6 +1,6 @@
 # EASYROMS storage
 
-On the first boot of a freshly flashed image, the console adds partition 3 to the **OS SD card**, starting at 640 MiB and using the remaining capacity. It performs a quick exFAT format, labels the volume `EASYROMS`, and mounts it read-write at `/easyroms`. EmulationStation creates the system, BIOS, save and state directories there. No second card or manual partitioning is required. The card needs at least 64 MiB beyond the system image; this MBR layout supports cards smaller than 2 TiB.
+Flash the matching `*-sdcard.img.gz` for a new card. On its first boot, the console adds partition 3 to the **OS SD card**, starting at 640 MiB and using the remaining capacity. It performs a quick exFAT format, labels the volume `EASYROMS`, and mounts it read-write at `/easyroms`. EmulationStation creates the system, BIOS, save and state directories there. No second card or manual partitioning is required. The card needs at least 64 MiB beyond the system image; this MBR layout supports cards smaller than 2 TiB.
 
 The bootloader, 64 MiB boot partition and 512 MiB root partition are left intact. The mounted root device identifies the OS card, so setup does not assume it is `mmcblk0` or partition an inserted USB drive/second card. Only the expected image layout is accepted. Existing third or fourth partitions with a different layout are left untouched; setup reports an error rather than overwriting them.
 
