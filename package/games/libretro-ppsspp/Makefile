@@ -9,7 +9,7 @@ PKG_SOURCE_URL:=https://github.com/hrydgard/ppsspp.git
 PKG_SOURCE_VERSION:=fa50bb1976065c4f8b1b47af227d367fe9771555
 PKG_SOURCE_SUBDIR:=ppsspp-$(PKG_VERSION)
 PKG_SOURCE:=ppsspp-$(PKG_VERSION)-$(PKG_SOURCE_VERSION).tar.zst
-PKG_MIRROR_HASH:=030b59567836fb83b65b17868ef99ff0115a11c49c985b9351a7b22de9067b2f
+PKG_MIRROR_HASH:=d7039651d5ba6b549234badf1192493b4b252960581ca4167b8350e78913676e
 PKG_SOURCE_SUBMODULES:=libretro/libretro-common ext/armips ext/glslang ext/SPIRV-Cross \
 	ext/rapidjson ext/miniupnp ext/zstd ext/cpu_features ext/rcheevos ext/naett \
 	ext/libchdr ext/lua ext/nanosvg ext/aemu_postoffice ext/OpenXR-SDK

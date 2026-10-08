@@ -237,6 +237,7 @@ endef
 # the short hash to 8 (default is 7). (for git log related usage)
 define DownloadMethod/rawgit
 	echo "Checking out files from the git repository..."; \
+	umask 022; \
 	mkdir -p $(TMP_DIR)/dl && \
 	cd $(TMP_DIR)/dl && \
 	rm -rf $(SUBDIR) && \
@@ -251,7 +252,7 @@ define DownloadMethod/rawgit
 		$(TAR) --numeric-owner --owner=0 --group=0 --ignore-failed-read -C $(SUBDIR) -f $(SUBDIR).tar.git -r .git .gitmodules 2>/dev/null \
 	) && \
 	rm -rf $(SUBDIR) && mkdir $(SUBDIR) && \
-	$(TAR) -C $(SUBDIR) -xf $(SUBDIR).tar.git && \
+	$(TAR) --no-same-permissions -C $(SUBDIR) -xf $(SUBDIR).tar.git && \
 	(cd $(SUBDIR) && $(if $(filter skip,$(SUBMODULES)),true,git submodule update --init --recursive -- $(SUBMODULES) && \
 	rm -rf .git .gitmodules)) && \
 	echo "Packing checkout..." && \

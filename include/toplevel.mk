@@ -230,8 +230,9 @@ else
   DOWNLOAD_DIRS = package/download
 endif
 
-download: .config FORCE $(if $(wildcard $(STAGING_DIR_HOST)/bin/flock),,tools/flock/compile) $(if $(wildcard $(STAGING_DIR_HOST)/bin/zstd),,tools/zstd/compile)
-	@+$(foreach dir,$(DOWNLOAD_DIRS),$(SUBMAKE) $(dir);)
+# Use the same archive tools before and during the build.
+download: .config FORCE $(if $(wildcard $(STAGING_DIR_HOST)/bin/flock),,tools/flock/compile) $(if $(wildcard $(STAGING_DIR_HOST)/bin/zstd),,tools/zstd/compile) $(if $(wildcard $(STAGING_DIR_HOST)/bin/tar),,tools/tar/compile)
+	@+set -e; $(foreach dir,$(DOWNLOAD_DIRS),$(SUBMAKE) $(dir);)
 
 clean dirclean: .config
 	@+$(SUBMAKE) -r $@
