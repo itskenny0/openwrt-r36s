@@ -1,0 +1,4 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+[ "$ACTION" = add ] || exit 0
+/usr/sbin/handheld-wifi apply || logger -t handheld-wifi 'Wi-Fi client setup failed'

@@ -39,8 +39,20 @@ echo 0xef > "$g/bDeviceClass"
 echo 0x02 > "$g/bDeviceSubClass"
 echo 0x01 > "$g/bDeviceProtocol"
 mkdir -p "$g/strings/0x409"
-serial=$(tr -cd '[:alnum:]' < /sys/firmware/devicetree/base/serial-number 2>/dev/null || true)
-[ -n "$serial" ] || serial=$(cat /etc/machine-id 2>/dev/null || echo rk3326)
+serial=
+if [ -r /sys/firmware/devicetree/base/serial-number ]; then
+	serial=$(tr -cd '[:alnum:]' < /sys/firmware/devicetree/base/serial-number)
+fi
+if [ -z "$serial" ] && [ -r /etc/handheld-id ]; then
+	serial=$(tr -cd '[:alnum:]' < /etc/handheld-id)
+fi
+if [ -z "$serial" ]; then
+	# Some bootloaders do not publish a SoC serial. Do not give those units
+	# the same USB serial and Ethernet MAC addresses.
+	serial=$(hexdump -v -n 16 -e '1/1 "%02x"' /dev/urandom)
+	[ "${#serial}" = 32 ] || exit 1
+	(umask 077; printf '%s\n' "$serial" > /etc/handheld-id)
+fi
 printf '%s\n' "$serial" > "$g/strings/0x409/serialnumber"
 echo OpenWrt > "$g/strings/0x409/manufacturer"
 echo 'OpenWrt handheld USB Ethernet' > "$g/strings/0x409/product"

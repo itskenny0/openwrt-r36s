@@ -27,7 +27,7 @@
 +					: "/usr/sbin/handheld-usb host";
 +				if (system(command) != 0)
 +					window->pushGui(new GuiMsgBox(window,
-+						"USB MODE CHANGE FAILED. THE PREVIOUS SETTING WAS RESTORED.", "OK"));
++						"USB MODE COULD NOT BE APPLIED OR SAVED. CHECK THE CONNECTION AND FREE SPACE.", "OK"));
 +			});
 +			ComponentListRow help;
 +			help.addElement(std::make_shared<TextComponent>(window, "CONNECT TO LUCI", Font::get(FONT_SIZE_MEDIUM), 0x777777FF), true);

@@ -24,7 +24,7 @@ class GadgetTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.env = dict(os.environ, FIXTURE=str(self.root))
         self.env["PATH"] = str(self.root / "bin") + os.pathsep + self.env["PATH"]
-        for path in ("bin", "var/lock", "sys/class/udc/ff580000.usb", "sys/class/usb_role/dwc2",
+        for path in ("bin", "etc", "var/lock", "sys/class/udc/ff580000.usb", "sys/class/usb_role/dwc2",
                      "sys/kernel/config/usb_gadget/openwrt/os_desc",
                      "sys/kernel/config/usb_gadget/openwrt/functions/rndis.usb1/os_desc/interface.rndis"):
             (self.root / path).mkdir(parents=True)
@@ -48,9 +48,13 @@ elif args[0] == "set":
     data[key] = value
     path.write_text(json.dumps(data))
 elif args[0] == "commit":
+    if (root / "fail-commit").exists():
+        (root / "fail-commit").unlink()
+        sys.exit(1)
     (root / "committed").write_text(args[1])
 ''', executable=True)
         files = ROOT / "package/system/rk3326-handheld/files"
+        self.write("usr/libexec/handheld-usb-access", "#!/bin/sh\nexit 0\n", executable=True)
         for path in ("usr/sbin/handheld-usb", "usr/libexec/handheld-usb-apply"):
             content = (files / path).read_text()
             # Substitute only filesystem roots; execute the original control flow.
@@ -85,6 +89,21 @@ elif args[0] == "commit":
         self.assertEqual(self.read("sys/kernel/config/usb_gadget/openwrt/UDC"), "")
         self.run_mode("status", expected=1)
 
+    def test_missing_hardware_serial_gets_persistent_unique_identity(self):
+        (self.root / "sys/firmware/devicetree/base/serial-number").unlink()
+        self.run_mode("gadget")
+        serial = self.read("etc/handheld-id")
+        self.assertEqual(len(serial), 32)
+        mac_path = "sys/kernel/config/usb_gadget/openwrt/functions/ecm.usb0/dev_addr"
+        mac = self.read(mac_path)
+        self.run_mode("host")
+        self.run_mode("gadget")
+        self.assertEqual(self.read("etc/handheld-id"), serial)
+        self.assertEqual(self.read(mac_path), mac)
+        (self.root / "etc/handheld-id").unlink()
+        self.run_mode("gadget")
+        self.assertNotEqual(self.read(mac_path), mac)
+
     def test_missing_controller_rolls_back_without_persisting(self):
         (self.root / "sys/class/udc/ff580000.usb").rmdir()
         self.run_mode("gadget", expected=1)
@@ -117,6 +136,16 @@ elif args[0] == "commit":
         self.run_mode("gadget", expected=1)
         self.run_mode("invalid", expected=2)
         self.assertFalse((self.root / "committed").exists())
+
+    def test_persistence_and_service_failure_restore_host(self):
+        self.write("fail-commit", "1")
+        self.run_mode("gadget", expected=1)
+        self.run_mode("status", expected=1)
+        self.assertEqual(self.read("sys/class/usb_role/dwc2/role"), "host")
+        self.write("usr/libexec/handheld-usb-access", "#!/bin/sh\nexit 1\n", executable=True)
+        self.run_mode("gadget", expected=1)
+        self.run_mode("status", expected=1)
+        self.assertEqual(self.read("sys/class/usb_role/dwc2/role"), "host")
 
     def test_upgrade_defaults_preserve_custom_network(self):
         data = {"network.lan.ipaddr": "192.168.5.1", "network.lan.device": "br-lan",

@@ -1,0 +1,28 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+set -eu
+
+# Gadget Ethernet belongs to LAN, so the attached computer is a DHCP client.
+# Keep the user's LAN address, lease range, password and SSH authentication.
+[ "$(uci -q get network.lan.proto)" = static ] || {
+	logger -t usb-gadget 'USB access requires a static LAN address'
+	exit 1
+}
+[ -n "$(uci -q get network.lan.ipaddr)" ] || exit 1
+if [ "$(uci -q get dhcp.lan.ignore || echo 0)" != 0 ] ||
+   [ "$(uci -q get dhcp.lan.dhcpv4 || echo server)" != server ]; then
+	uci set dhcp.lan.ignore=0
+	uci set dhcp.lan.dhcpv4=server
+	uci commit dhcp
+fi
+# A missing lease pool must not silently produce an unusable link.
+[ "$(uci -q get dhcp.lan.interface)" = lan ] || exit 1
+[ "$(uci -q get dhcp.lan.limit)" -gt 0 ] || exit 1
+if [ "$(uci -q get dropbear.main.enable || echo 1)" != 1 ]; then
+	uci set dropbear.main.enable=1
+	uci commit dropbear
+fi
+for service in dropbear dnsmasq uhttpd; do
+	"/etc/init.d/$service" enable
+	"/etc/init.d/$service" reload
+done

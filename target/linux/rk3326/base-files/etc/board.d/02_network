@@ -2,5 +2,7 @@
 . /lib/functions/uci-defaults.sh
 board_config_update
 ucidef_set_interface_lan 'usb0 usb1'
+# Keep the management link away from common home-router Wi-Fi subnets.
+ucidef_set_interface lan ipaddr '192.168.77.1' netmask '255.255.255.0'
 board_config_flush
 exit 0

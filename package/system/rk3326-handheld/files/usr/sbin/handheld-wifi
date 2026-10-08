@@ -1,0 +1,80 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# Configure a WPA2 client before replacing the USB cable with a Wi-Fi dongle.
+# Credentials arrive on stdin, never as command-line arguments.
+set -eu
+umask 077
+export LC_ALL=C
+mkdir -p /var/lock
+exec 9>/var/lock/handheld-wifi.lock
+flock -x 9
+
+case "${1:-}" in
+	configure)
+		[ ! -t 0 ] || printf 'Wi-Fi network name: ' >&2
+		IFS= read -r ssid
+		if [ -z "$ssid" ] || [ "${#ssid}" -gt 32 ]; then echo 'SSID must contain 1 to 32 bytes.' >&2; exit 2; fi
+		if [ -t 0 ]; then
+			printf 'Wi-Fi password: ' >&2
+			trap 'stty echo' EXIT
+			trap 'exit 1' HUP INT TERM
+			stty -echo
+		fi
+		IFS= read -r key
+		if [ -t 0 ]; then stty echo; trap - EXIT HUP INT TERM; printf '\n' >&2; fi
+		if [ "${#key}" -lt 8 ] || [ "${#key}" -gt 63 ]; then echo 'WPA2 passphrase must contain 8 to 63 bytes.' >&2; exit 2; fi
+		# Keep an existing radio selection when reconfiguring this profile.
+		radio=$(uci -q get wireless.handheld.device || echo radio0)
+		touch /etc/config/wireless
+		chmod 600 /etc/config/wireless
+		uci set network.wwan=interface
+		uci set network.wwan.proto=dhcp
+		uci commit network
+		# The client belongs to WAN: it must not expose LuCI/SSH or a DHCP
+		# server to the access point, and it must not bridge LAN into Wi-Fi.
+		. /lib/functions.sh
+		wan=
+		find_wan() {
+			# shellcheck disable=SC3043
+			local name
+			config_get name "$1" name
+			[ "$name" != wan ] || wan=$1
+		}
+		config_load firewall
+		config_foreach find_wan zone
+		[ -n "$wan" ] || { echo 'Configure a WAN firewall zone in LuCI first.' >&2; exit 1; }
+		case " $(uci -q get "firewall.$wan.network" || true) " in
+			*' wwan '*) ;;
+			*) uci add_list "firewall.$wan.network=wwan"; uci commit firewall ;;
+		esac
+		uci set wireless.handheld=wifi-iface
+		uci set "wireless.handheld.device=$radio"
+		uci set wireless.handheld.mode=sta
+		uci set wireless.handheld.network=wwan
+		uci set wireless.handheld.encryption=psk2
+		uci set wireless.handheld.disabled=0
+		uci set "wireless.handheld.ssid=$ssid"
+		uci set "wireless.handheld.key=$key"
+		uci commit wireless
+		/etc/init.d/network reload
+		/etc/init.d/firewall reload
+		;;
+	apply)
+		[ "$(uci -q get wireless.handheld.mode || true)" = sta ] || exit 0
+		[ "$(uci -q get wireless.handheld.disabled || echo 0)" = 0 ] || exit 0
+		radio=$(uci -q get wireless.handheld.device)
+		case "$radio" in radio[0-9]*) ;; *) exit 1 ;; esac
+		# wifi config creates the radio when the dongle first appears.
+		[ "$(uci -q get "wireless.$radio" || true)" = wifi-device ] || exit 0
+		if [ "$(uci -q get "wireless.$radio.disabled" || echo 1)" != 0 ]; then
+			uci set "wireless.$radio.disabled=0"
+			uci commit wireless
+		fi
+		/sbin/wifi up "$radio"
+		exit
+		;;
+	*) echo 'Usage: handheld-wifi {configure|apply}' >&2; exit 2 ;;
+esac
+# Configure can run before the dongle is inserted. The hotplug hook retries.
+flock -u 9
+exec "$0" apply

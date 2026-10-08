@@ -14,11 +14,17 @@ flock -x 8
 
 # Persist only after a successful role change. Restore the old role on failure.
 previous=$(uci -q get handheld.usb.mode || echo host)
+case "$previous" in host|gadget) ;; *) previous=host ;; esac
 [ "$persist" = 1 ] || mode=$previous
-if /usr/libexec/handheld-usb-apply "$mode"; then
+if /usr/libexec/handheld-usb-apply "$mode" &&
+   { [ "$mode" != gadget ] || /usr/libexec/handheld-usb-access; }; then
 	if [ "$persist" = 1 ]; then
-		uci set "handheld.usb.mode=$mode"
-		uci commit handheld
+		if ! { uci set "handheld.usb.mode=$mode" && uci commit handheld; }; then
+			if uci set "handheld.usb.mode=$previous"; then uci commit handheld || true; fi
+			/usr/libexec/handheld-usb-apply "$previous" || true
+			logger -t usb-gadget 'Could not save USB mode; reverted the change'
+			exit 1
+		fi
 	fi
 else
 	/usr/libexec/handheld-usb-apply "$previous" || true
