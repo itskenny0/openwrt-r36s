@@ -38,6 +38,25 @@ define Package/rtl8188fu-firmware/install
 endef
 $(eval $(call BuildPackage,rtl8188fu-firmware))
 
+Package/rtl8xxxu-firmware = $(call Package/firmware-default,RealTek RTL8XXXU firmware,+rtl8188eu-firmware +rtl8188fu-firmware +rtl8192cu-firmware +rtl8192eu-firmware +rtl8723au-firmware +rtl8723bu-firmware,LICENSES/LICENCE.rtlwifi_firmware.txt,LicenseRef-rtlwifi-firmware)
+define Package/rtl8xxxu-firmware/install
+	$(INSTALL_DIR) $(1)/lib/firmware/rtlwifi $(1)/usr/share/licenses/rtl8xxxu-firmware
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/rtlwifi/rtl8710bufw_SMIC.bin $(1)/lib/firmware/rtlwifi/
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/rtlwifi/rtl8710bufw_UMC.bin $(1)/lib/firmware/rtlwifi/
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/rtlwifi/rtl8192fufw.bin $(1)/lib/firmware/rtlwifi/
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/LICENSES/LICENCE.rtlwifi_firmware.txt $(1)/usr/share/licenses/rtl8xxxu-firmware/
+endef
+$(eval $(call BuildPackage,rtl8xxxu-firmware))
+
+Package/rtl8703b-firmware = $(call Package/firmware-default,RealTek RTL8703B firmware,,LICENSES/LICENCE.rtlwifi_firmware.txt,LicenseRef-rtlwifi-firmware)
+define Package/rtl8703b-firmware/install
+	$(INSTALL_DIR) $(1)/lib/firmware/rtw88 $(1)/usr/share/licenses/rtl8703b-firmware
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/rtw88/rtw8703b_fw.bin $(1)/lib/firmware/rtw88/
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/rtw88/rtw8703b_wow_fw.bin $(1)/lib/firmware/rtw88/
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/LICENSES/LICENCE.rtlwifi_firmware.txt $(1)/usr/share/licenses/rtl8703b-firmware/
+endef
+$(eval $(call BuildPackage,rtl8703b-firmware))
+
 Package/rtl8192ce-firmware = $(call Package/firmware-default,RealTek RTL8192CE firmware,,LICENCE.rtlwifi_firmware.txt)
 define Package/rtl8192ce-firmware/install
 	$(INSTALL_DIR) $(1)/lib/firmware/rtlwifi

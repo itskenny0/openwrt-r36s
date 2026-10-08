@@ -22,7 +22,7 @@ The mode is saved only after configuration succeeds. A failed USB transition or 
 
 ## USB Wi-Fi client
 
-The image includes mainline USB Wi-Fi drivers and firmware for rtl8xxxu, rtw88 8821CU/8723DU, MediaTek MT7601U and MT76x0U/MT76x2U families, plus supported built-in SDIO radios. See `HARDWARE.md` for the driver inventory. Match the dongle's USB chipset ID to a supported driver; a retail product name alone does not establish its chipset.
+The image includes mainline USB Wi-Fi drivers and firmware for rtl8xxxu, rtw88 8723DU/8821AU/8821CU/8812AU/8814AU/8822BU/8822CU, MediaTek MT7601U and MT76x0U/MT76x2U families, plus supported built-in SDIO radios. See `HARDWARE.md` for the driver inventory. Match the dongle's USB chipset ID to a supported driver; a retail product name alone does not establish its chipset.
 
 The OTG port cannot act as a USB Ethernet device and host a Wi-Fi dongle at the same time. On a console with one host-capable port, configure Wi-Fi before swapping the cable:
 

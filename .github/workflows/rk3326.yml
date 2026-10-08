@@ -60,6 +60,7 @@ jobs:
       - name: Validate release payload
         run: |
           python3 scripts/rk3326-check-config.py
+          python3 scripts/rk3326-check-firmware.py
           python3 scripts/rk3326-check-kernel.py build_dir/target-*/linux-rk3326*/linux-6.18.*/.config
           python3 scripts/rk3326-check-images.py bin/targets/rk3326/generic
           python3 scripts/rk3326-smoke.py

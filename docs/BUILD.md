@@ -26,6 +26,7 @@ The 32 MiB region before the first partition reserves Rockchip bootloader slots:
 python3 -m unittest discover -s tests -v
 python3 scripts/rk3326-systems.py --check
 python3 scripts/rk3326-check-config.py
+python3 scripts/rk3326-check-firmware.py
 python3 scripts/rk3326-check-kernel.py build_dir/target-*/linux-rk3326*/linux-6.18.*/.config
 python3 scripts/rk3326-check-images.py bin/targets/rk3326/generic
 python3 scripts/rk3326-smoke.py
@@ -35,7 +36,7 @@ sudo python3 scripts/rk3326-network-smoke.py
 python3 scripts/rk3326-ui-smoke.py
 ```
 
-The image check expects all profiles. It checks fwtool metadata, the gzip stream, partition bounds, bootloader slots, squashfs magic, the arm64 kernel, U-Boot script checksum and every DTB in the FAT filesystem. The kernel check inspects the resolved configuration and fails if a boot-critical driver became a module or was dropped.
+The image check expects all profiles. It checks fwtool metadata, the gzip stream, partition bounds, bootloader slots, squashfs magic, the arm64 kernel, U-Boot script checksum and every DTB in the FAT filesystem. The kernel check inspects the resolved configuration and fails if a boot-critical driver became a module or was dropped. The firmware check reads the networking modules' compiled firmware filenames and requires the corresponding files and symlink targets in the final root filesystem.
 
 The QEMU smoke check loads every installed core, decodes original PNG/H.264 fixtures, checks PSP codecs, and renders an SDL/EGL/GLES framebuffer using Mesa softpipe. Original GB, NES, SNES, GBA, Mega Drive, PC Engine and PS1 programs exercise CPU execution, video, audio, cartridge RAM and save-state restoration. The UI test uses proot and SDL events to drive the actual EmulationStation menus, toggle USB Ethernet through a simulated helper boundary, launch a game with RetroArch, save and return, and show a missing-game error. The shutdown test stops the packaged session supervisor while RetroArch runs an original test cartridge, then checks save flushing and reloading across two launches. The target upgrade validator rejects gzip corruption even when fwtool metadata remains valid. A separate network namespace test connects a virtual USB host to the packaged DHCP server and checks the packaged SSH server greeting. The menu test also exercises persistent brightness and volume. Screenshots and logs are retained as CI artifacts. These tests do not emulate RK3326 display, input, audio or USB hardware, or establish game compatibility and speed.
 
