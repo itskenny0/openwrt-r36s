@@ -1,0 +1,21 @@
+--- a/libretro/libretro.cpp
++++ b/libretro/libretro.cpp
+@@ -490,12 +490,12 @@
+    check_dynamic_variables(coreParam);
+ 
+    struct retro_variable var = {0};
+-   std::string sTextureShaderName_prev;
+-   int iInternalResolution_prev;
+-   int iTexScalingType_prev;
+-   int iTexScalingLevel_prev;
+-   int iMultiSampleLevel_prev;
+-   bool bDisplayCropTo16x9_prev;
++   std::string sTextureShaderName_prev = g_Config.sTextureShaderName;
++   int iInternalResolution_prev = g_Config.iInternalResolution;
++   int iTexScalingType_prev = g_Config.iTexScalingType;
++   int iTexScalingLevel_prev = g_Config.iTexScalingLevel;
++   int iMultiSampleLevel_prev = g_Config.iMultiSampleLevel;
++   bool bDisplayCropTo16x9_prev = g_Config.bDisplayCropTo16x9;
+ 
+    var.key = "ppsspp_language";
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)

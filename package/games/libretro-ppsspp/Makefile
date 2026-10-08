@@ -3,7 +3,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=libretro-ppsspp
 PKG_VERSION:=1.20.4
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/hrydgard/ppsspp.git
 PKG_SOURCE_VERSION:=fa50bb1976065c4f8b1b47af227d367fe9771555
