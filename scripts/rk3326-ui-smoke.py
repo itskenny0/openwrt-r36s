@@ -17,7 +17,7 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("--scenario", choices=("all", "usb", "game"), default="all")
+parser.add_argument("--scenario", choices=("all", "usb", "settings", "game"), default="all")
 scenario = parser.parse_args().scenario
 stage = ROOT / "staging_dir/target-aarch64_cortex-a35_musl"
 source = ROOT / "build_dir/target-aarch64_cortex-a35_musl/root-rk3326"
@@ -61,6 +61,19 @@ host) rm -f /test/usb-enabled ;;
 address) echo 192.168.1.1 ;;
 esac
 ''', executable=True)
+
+write("usr/sbin/handheld-settings", '''#!/bin/sh
+printf '%s %s\\n' "$1" "${2:-}" >> /test/settings-calls
+case "$1" in
+brightness-get) cat /test/brightness ;;
+brightness-set) echo "$2" > /test/brightness ;;
+volume-get) cat /test/volume ;;
+volume-set) echo "$2" > /test/volume ;;
+*) exit 1 ;;
+esac
+''', executable=True)
+write("test/brightness", "50\n")
+write("test/volume", "70\n")
 
 
 def frontend(name, actions, startup="tools"):
@@ -115,6 +128,37 @@ if scenario in ("all", "usb"):
     assert (root / "test/usb-calls").read_text().splitlines() == ["status", "gadget", "status", "host"]
 if scenario == "usb":
     print("Rendered ES menus and persistent USB toggle passed.")
+    raise SystemExit(0)
+
+if scenario in ("all", "settings"):
+    frontend("brightness", """3 Return
+6 Down
+7 Down
+8 Down
+9 A
+12 capture
+13 Right
+14 B
+17 capture
+18 B
+19 quit
+""")
+    assert (root / "test/brightness").read_text().strip() == "55", "Brightness was not saved from the native menu"
+    frontend("volume", """3 Return
+6 Down
+7 Down
+8 A
+11 capture
+12 Left
+13 B
+16 B
+17 quit
+""")
+    assert (root / "test/volume").read_text().strip() == "69", "Volume was not saved from the native menu"
+    assert (root / "test/settings-calls").read_text().splitlines() == [
+        "brightness-get ", "brightness-set 55", "volume-get ", "volume-set 69"]
+if scenario == "settings":
+    print("Rendered brightness and volume controls passed.")
     raise SystemExit(0)
 
 # Run a real core through the real launcher; bound execution for unattended CI.

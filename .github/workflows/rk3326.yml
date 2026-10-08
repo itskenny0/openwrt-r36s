@@ -19,6 +19,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install test dependencies
+        run: sudo apt-get update && sudo apt-get install -y busybox bsdextrautils
       - name: Check integration
         run: |
           python3 -m unittest discover -s tests -v
@@ -28,6 +30,8 @@ jobs:
           shellcheck -s sh -e SC1091,SC2034 package/system/rk3326-handheld/files/etc/init.d/* package/system/rk3326-handheld/files/usr/sbin/* package/system/rk3326-handheld/files/usr/libexec/* package/games/emulationstation/files/etc/init.d/* package/games/emulationstation/files/usr/bin/*
           shellcheck -s sh package/games/retroarch/files/handheld-*
           shellcheck -s sh -e SC1091 package/system/rk3326-handheld/files/etc/uci-defaults/*
+          shellcheck -s sh package/system/rk3326-handheld/files/etc/hotplug.d/ieee80211/*
+          shellcheck -s bash -e SC2034 target/linux/rk3326/base-files/lib/upgrade/platform.sh
   build:
     needs: check
     runs-on: ubuntu-24.04
@@ -43,7 +47,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential clang flex bison g++ gawk gcc-multilib gettext git libncurses-dev libssl-dev python3 python3-setuptools python3-pyelftools python3-dev rsync swig unzip zlib1g-dev file wget curl libelf-dev device-tree-compiler qemu-user proot
+          sudo apt-get install -y build-essential clang flex bison g++ gawk gcc-multilib gettext git libncurses-dev libssl-dev python3 python3-setuptools python3-pyelftools python3-dev rsync swig unzip zlib1g-dev file wget curl libelf-dev device-tree-compiler qemu-user proot iproute2 util-linux
       - name: Configure all handheld profiles
         run: ./scripts/rk3326-configure.sh all
       - name: Download sources
@@ -59,15 +63,18 @@ jobs:
           python3 scripts/rk3326-check-kernel.py build_dir/target-*/linux-rk3326*/linux-6.18.*/.config
           python3 scripts/rk3326-check-images.py bin/targets/rk3326/generic
           python3 scripts/rk3326-smoke.py
+          python3 scripts/rk3326-upgrade-smoke.py
+          sudo python3 scripts/rk3326-network-smoke.py
           python3 scripts/rk3326-ui-smoke.py
           ./scripts/diffconfig.sh > bin/targets/rk3326/generic/build.config
           cp feeds.conf.default bin/targets/rk3326/generic/feeds.lock
           cp docs/TESTING.md bin/targets/rk3326/generic/TESTING.md
           cp docs/EMULATORS.md bin/targets/rk3326/generic/EMULATORS.md
+          cp docs/NETWORKING.md bin/targets/rk3326/generic/NETWORKING.md
           git rev-parse HEAD > bin/targets/rk3326/generic/source.commit
           cd bin/targets/rk3326/generic
           tar -czf packages.tar.gz -C ../../../ packages targets/rk3326/generic/packages
-          sha256sum ./*.img.gz ./*.manifest build.config feeds.lock source.commit TESTING.md EMULATORS.md packages.tar.gz > SHA256SUMS
+          sha256sum ./*.img.gz ./*.manifest build.config feeds.lock source.commit TESTING.md EMULATORS.md NETWORKING.md packages.tar.gz > SHA256SUMS
       - name: Upload firmware and package feed
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -86,6 +93,8 @@ jobs:
           path: |
             .work/ui-smoke/*.png
             .work/ui-smoke/*.log
+            .work/network-smoke/*.log
+            .work/upgrade-smoke/*.log
           if-no-files-found: ignore
           retention-days: 14
       - name: Upload build diagnostics
@@ -93,6 +102,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: build-diagnostics
+          include-hidden-files: true
           path: |
             .work/logs/
             logs/
@@ -104,12 +114,20 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: rk3326-firmware
           path: release
+      - name: Verify release checksums
+        run: cd release/targets/rk3326/generic && sha256sum -c SHA256SUMS
+      - name: Attest release payload
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-checksums: release/targets/rk3326/generic/SHA256SUMS
       - name: Publish prerelease
         env:
           GH_TOKEN: ${{ github.token }}
@@ -118,4 +136,4 @@ jobs:
         run: |
           cd release/targets/rk3326/generic
           sha256sum -c SHA256SUMS
-          gh release create "$RELEASE_TAG" --verify-tag --prerelease --title "OpenWrt RK3326 $RELEASE_TAG" --notes-file "$GITHUB_WORKSPACE/docs/RELEASE.md" ./*.img.gz ./*.manifest ./SHA256SUMS ./build.config ./feeds.lock ./source.commit ./TESTING.md ./EMULATORS.md ./packages.tar.gz
+          gh release create "$RELEASE_TAG" --verify-tag --prerelease --title "OpenWrt RK3326 $RELEASE_TAG" --notes-file "$GITHUB_WORKSPACE/docs/RELEASE.md" ./*.img.gz ./*.manifest ./SHA256SUMS ./build.config ./feeds.lock ./source.commit ./TESTING.md ./EMULATORS.md ./NETWORKING.md ./packages.tar.gz

@@ -18,13 +18,13 @@ Download the image matching your device from [Releases](https://github.com/itske
 
 Put the card in the OS/TF1 slot. EmulationStation starts automatically. For other panels and clone hardware, follow [device and panel setup](docs/HARDWARE.md).
 
-In EmulationStation, press **Start → Network Settings → USB Ethernet**, enable the switch and leave the menu to apply it. Connect a data cable from the console's OTG port to your computer. The computer should obtain an address by DHCP. Open **http://192.168.1.1/** for LuCI; **Connect to LuCI** in the same menu shows the configured address. Set a root password on first use. Standard OpenWrt SSH access is also available.
+In EmulationStation, press **Start → Network Settings → USB Ethernet**, enable the switch and leave the menu to apply it. Connect a data cable from the console's OTG port to your computer. The computer receives an address by DHCP. Enabling the setting enables SSH, DHCP and the LuCI web service. Open **http://192.168.77.1/** for LuCI; **Connect to LuCI** in the same menu shows the configured address. Set a root password on first use. Connect over SSH as `root@192.168.77.1`. Configuration-preserving upgrades retain the previous LAN address; **Connect to LuCI** shows the actual address.
 
-The USB setting defaults to host mode so USB peripherals can be used. Disable USB Ethernet before connecting a Wi-Fi adapter to the same port. Charging-only ports and cables cannot carry Ethernet. Linux/macOS use CDC ECM; the second USB configuration provides RNDIS for Windows. Host driver selection still needs hardware testing.
+The USB setting defaults to host mode so USB peripherals can be used. Disable USB Ethernet before connecting a Wi-Fi adapter to the same port. USB Wi-Fi client mode is supported; see [network setup](docs/NETWORKING.md) to provision a dongle before swapping the cable. Charging-only ports and cables cannot carry Ethernet. Linux/macOS use CDC ECM; the second USB configuration provides RNDIS for Windows. Host driver selection still needs hardware testing.
 
 Copy your games to the matching [system folders](docs/EMULATORS.md) under `/roms` over SSH/SCP, then restart EmulationStation to refresh the list. Select + Start exits RetroArch. Mount a separate games card at `/roms` using **LuCI → System → Mount Points** before copying games. The initial root partition is 512 MiB; it does not automatically fill the SD card.
 
-Use **Start → Quit → Shutdown System** before removing power. Suspend, automatic headphone routing and physical power-button shortcuts are not yet provided by the frontend integration.
+Use **Start → Quit → Shutdown System**, or hold the power button for two seconds, before removing power. Volume buttons and headphone routing are handled by a background service. **Start → Display Settings** controls brightness; brightness and volume persist across boots. Suspend is not integrated. These hardware controls still require console testing.
 
 ## Build and maintain
 

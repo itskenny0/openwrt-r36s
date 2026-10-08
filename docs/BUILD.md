@@ -6,7 +6,7 @@ Use a Linux x86-64 build host. Ubuntu 24.04 is the CI reference. Allow at least 
 sudo apt-get update
 sudo apt-get install build-essential clang flex bison g++ gawk gcc-multilib gettext git \
   libncurses-dev libssl-dev python3 python3-setuptools python3-pyelftools python3-dev \
-  rsync swig unzip zlib1g-dev file wget curl libelf-dev device-tree-compiler qemu-user proot
+  rsync swig unzip zlib1g-dev file wget curl libelf-dev device-tree-compiler qemu-user proot busybox bsdextrautils iproute2 util-linux
 git clone https://github.com/itskenny0/openwrt-r36s.git
 cd openwrt-r36s
 ./scripts/rk3326-configure.sh all
@@ -29,23 +29,25 @@ python3 scripts/rk3326-check-config.py
 python3 scripts/rk3326-check-kernel.py build_dir/target-*/linux-rk3326*/linux-6.18.*/.config
 python3 scripts/rk3326-check-images.py bin/targets/rk3326/generic
 python3 scripts/rk3326-smoke.py
+python3 scripts/rk3326-upgrade-smoke.py
+sudo python3 scripts/rk3326-network-smoke.py
 python3 scripts/rk3326-ui-smoke.py
 ```
 
 The image check expects all profiles. It checks fwtool metadata, the gzip stream, partition bounds, bootloader slots, squashfs magic, the arm64 kernel, U-Boot script checksum and every DTB in the FAT filesystem. The kernel check inspects the resolved configuration and fails if a boot-critical driver became a module or was dropped.
 
-The QEMU smoke check loads every installed core, decodes original PNG/H.264 fixtures, checks PSP codecs, and renders an SDL/EGL/GLES framebuffer using Mesa softpipe. Original GB, NES, SNES, GBA, Mega Drive, PC Engine and PS1 programs exercise CPU execution, video, audio, cartridge RAM and save-state restoration. The UI test uses proot and SDL events to drive the actual EmulationStation menus, toggle USB Ethernet through a simulated helper boundary, launch a game with RetroArch, save and return, and show a missing-game error. Screenshots and logs are retained as CI artifacts. These tests do not emulate RK3326 display, input, audio or USB hardware, or establish game compatibility and speed.
+The QEMU smoke check loads every installed core, decodes original PNG/H.264 fixtures, checks PSP codecs, and renders an SDL/EGL/GLES framebuffer using Mesa softpipe. Original GB, NES, SNES, GBA, Mega Drive, PC Engine and PS1 programs exercise CPU execution, video, audio, cartridge RAM and save-state restoration. The UI test uses proot and SDL events to drive the actual EmulationStation menus, toggle USB Ethernet through a simulated helper boundary, launch a game with RetroArch, save and return, and show a missing-game error. The target upgrade validator rejects gzip corruption even when fwtool metadata remains valid. A separate network namespace test connects a virtual USB host to the packaged DHCP server and checks the packaged SSH server greeting. The menu test also exercises persistent brightness and volume. Screenshots and logs are retained as CI artifacts. These tests do not emulate RK3326 display, input, audio or USB hardware, or establish game compatibility and speed.
 
 ## GitHub releases
 
-`.github/workflows/rk3326.yml` runs integration checks and builds firmware on pushes to `main`, pull requests, manual dispatch and `v*` tags. A version tag publishes a **prerelease** only after a successful build and payload validation. Actions are pinned by commit. The release job alone has write permission.
+`.github/workflows/rk3326.yml` runs integration checks and builds firmware on pushes to `main`, pull requests, manual dispatch and `v*` tags. A version tag publishes a **prerelease** only after a successful build, payload validation and a GitHub artifact attestation. Actions are pinned by commit. The release job alone has write permission.
 
 ```sh
 git tag v0.1.0-rc1
 git push origin v0.1.0-rc1
 ```
 
-Assets include per-device images and manifests, `SHA256SUMS`, `build.config`, `feeds.lock`, `source.commit`, the hardware test checklist and `packages.tar.gz`. CI logs and temporary artifacts have limited retention; releases retain the published payload.
+Assets include per-device images and manifests, `SHA256SUMS`, `build.config`, `feeds.lock`, `source.commit`, the hardware test checklist, emulator/networking guides and `packages.tar.gz`. CI logs and temporary artifacts have limited retention; releases retain the published payload.
 
 The package archive contains both `packages/` (userspace feeds) and `targets/rk3326/generic/packages/` (kernel modules), including signed indexes. Official snapshot feeds are disabled because this target and its kernel ABI are different. Extract the archive from the **same release** to a computer, serve that directory over HTTP, and put the desired `packages.adb` URLs in `/etc/apk/repositories.d/customfeeds.list`. Then use `apk update` and LuCI's package manager normally. The firmware already trusts the package signing key from its build; do not bypass signature checks. Packages absent from that archive require a new build with those packages selected.
 
@@ -55,4 +57,19 @@ Feeds are pinned in `feeds.conf.default`; custom package sources have explicit r
 
 Upload the matching `sysupgrade.img.gz` through LuCI or use OpenWrt `sysupgrade`. Normal configuration-preserving upgrades save `boot.env`, custom overlays, UCI configuration and EmulationStation settings. A reset upgrade (`sysupgrade -n`) restores image defaults. ROMs, saves and artwork on the root filesystem are **not** part of the configuration backup; keep them on a separate games card or back them up before upgrading.
 
-When the partition layout matches, sysupgrade updates the boot and root partitions and leaves the installed bootloader in place. To change bootloader variants or refresh DDR/BL31 firmware, write a complete image to a spare SD card. Do not cross-flash profiles simply because they share an RK3326 processor.
+Upgrade validation checks the entire compressed stream and exact partition sizes before any write. Changed layouts, missing partitions, failed panel backups and write errors stop the upgrade; the hooks cannot fall through to a success message. `sysupgrade -p` is intentionally rejected: changing the partition table requires writing a complete SD image.
+
+When the partition layout matches, sysupgrade updates the boot and root partitions and leaves the installed bootloader, disk signature and any additional games partition in place. To change bootloader variants or refresh DDR/BL31 firmware, write a complete image to a spare SD card. Do not cross-flash profiles simply because they share an RK3326 processor.
+
+## Verify release provenance
+
+After downloading an image, verify both its checksum and its [GitHub build attestation](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations):
+
+```sh
+sha256sum --ignore-missing -c SHA256SUMS
+gh attestation verify openwrt-rk3326-generic-gameconsole_r36s-squashfs-sysupgrade.img.gz \
+  --repo itskenny0/openwrt-r36s \
+  --signer-workflow itskenny0/openwrt-r36s/.github/workflows/rk3326.yml
+```
+
+Compare the verified source commit with the release tag and attached `source.commit`. The attestation identifies the CI workflow and payload digest; hardware validation remains a separate requirement.
