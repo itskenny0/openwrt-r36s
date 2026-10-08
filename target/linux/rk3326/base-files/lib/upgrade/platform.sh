@@ -1,100 +1,106 @@
+# SPDX-License-Identifier: GPL-2.0-only
 REQUIRE_IMAGE_METADATA=1
 
-platform_pre_upgrade() {
-	local partdev
-	[ -n "$UPGRADE_BACKUP" ] || return 0
-	export_bootdevice && export_partdevice partdev 1 || return 1
-	mkdir -p /tmp/handheld-boot /mnt
-	mount -o ro,noatime "/dev/$partdev" /mnt || return 1
-	[ ! -f /mnt/boot.env ] || cp -a /mnt/boot.env /tmp/handheld-boot/
-	[ ! -d /mnt/overlays ] || cp -a /mnt/overlays /tmp/handheld-boot/
-	umount /mnt
+# The generic stage2 dispatcher ignores hook return codes. A failed destructive
+# operation must exit its shell so it cannot announce success and reboot.
+rk3326_upgrade_abort() {
+	echo "Upgrade stopped: $*" >&2
+	exit 1
 }
 
-platform_check_image() {
-	local diskdev partdev diff
+# Strip fwtool's trailer before checking gzip's CRC. Keep the root filesystem
+# compressed in RAM: a raw image is too large for these consoles.
+rk3326_image_stream() (
+	set -o pipefail
+	# zcat forks a seamless decompressor and can discard its CRC failure.
+	fwtool -q -T -i /dev/null "$1" | busybox gunzip -c
+)
 
-	export_bootdevice && export_partdevice diskdev 0 || {
-		echo "Unable to determine upgrade device"
+# This port ships MBR images. Check the format before the generic partition
+# reader, whose invalid-table path can otherwise exit with status zero.
+rk3326_partitions() {
+	local magic
+	magic=$(hexdump -v -s 510 -n 2 -e '2/1 "%02x"' "$1")
+	[ "$magic" = 55aa ] || return 1
+	rm -f "/tmp/partmap.$2"
+	get_partitions "$1" "$2"
+	[ -s "/tmp/partmap.$2" ]
+}
+
+platform_check_image() (
+	local diskdev partdev bytes expected part start size
+	set -o pipefail
+	if [ "${SAVE_PARTITIONS:-1}" != 1 ] || [ "${UPGRADE_OPT_SAVE_PARTITIONS:-1}" != 1 ]; then
+		echo 'Changing the partition table requires writing a full SD image.' >&2
+		return 1
+	fi
+	export_bootdevice && export_partdevice diskdev 0 || return 1
+	# Drain the stream so every decompression/checksum error is observed.
+	rk3326_image_stream "$1" | { dd of=/tmp/image.bs bs=512 count=1 iflag=fullblock 2>/dev/null && cat >/dev/null; } || return 1
+	rk3326_partitions /tmp/image.bs image || return 1
+	rk3326_partitions "/dev/$diskdev" bootdisk || return 1
+	# Never overwrite an unexpected partition, a resized root or a games card.
+	awk 'NR == 1 { if ($1 != 1 || $2 != 65536 || $3 != 131072) exit 1 }
+	     NR == 2 { if ($1 != 2 || $2 < 196608 || $2 % 2048 != 0 || $3 <= 0) exit 1 }
+	     END { if (NR != 2) exit 1 }' /tmp/partmap.image || return 1
+	grep -F -x -v -f /tmp/partmap.bootdisk /tmp/partmap.image >/dev/null && {
+		echo 'Partition layout changed. Write a full image to a spare card.' >&2
 		return 1
 	}
+	while read -r part start size; do
+		export_partdevice partdev "$part" || return 1
+	done < /tmp/partmap.image
+	expected=$(awk 'END { printf "%.0f", ($2 + $3) * 512 }' /tmp/partmap.image)
+	bytes=$(rk3326_image_stream "$1" | wc -c) || return 1
+	[ "$bytes" -eq "$expected" ] || {
+		echo 'Image length does not match its partition table.' >&2
+		return 1
+	}
+)
 
-	get_partitions "/dev/$diskdev" bootdisk
-
-	#extract the boot sector from the image
-	get_image "$@" | dd of=/tmp/image.bs count=1 bs=512b 2>/dev/null
-
-	get_partitions /tmp/image.bs image
-
-	#compare tables
-	diff="$(grep -F -x -v -f /tmp/partmap.bootdisk /tmp/partmap.image)"
-
-	rm -f /tmp/image.bs /tmp/partmap.bootdisk /tmp/partmap.image
-
-	if [ -n "$diff" ]; then
-		echo "Partition layout has changed. Full image will be written."
-		ask_bool 0 "Abort" && exit 1
-		return 0
-	fi
+platform_pre_upgrade() {
+	local partdev failed=0
+	platform_check_image "$1" || rk3326_upgrade_abort 'image or partition validation failed'
+	[ -n "$UPGRADE_BACKUP" ] || return 0
+	export_bootdevice || rk3326_upgrade_abort 'boot device unavailable'
+	export_partdevice partdev 1 || rk3326_upgrade_abort 'boot partition unavailable'
+	mkdir -p /tmp/handheld-boot /mnt || rk3326_upgrade_abort 'cannot prepare boot backup'
+	mount -o ro,noatime "/dev/$partdev" /mnt || rk3326_upgrade_abort 'cannot mount boot partition'
+	if [ -f /mnt/boot.env ]; then cp /mnt/boot.env /tmp/handheld-boot/ || failed=1; fi
+	if [ -d /mnt/overlays ]; then cp -R /mnt/overlays /tmp/handheld-boot/ || failed=1; fi
+	umount /mnt || failed=1
+	[ "$failed" = 0 ] || rk3326_upgrade_abort 'cannot preserve panel configuration'
 }
 
 platform_copy_config() {
-	local partdev
-
-	if export_partdevice partdev 1; then
-		mount -o rw,noatime "/dev/$partdev" /mnt || return 1
-		cp -af "$UPGRADE_BACKUP" "/mnt/$BACKUP_FILE"
-		[ ! -d /tmp/handheld-boot ] || cp -af /tmp/handheld-boot/. /mnt/
-		umount /mnt
-	fi
+	local partdev failed=0
+	export_bootdevice || rk3326_upgrade_abort 'boot device unavailable'
+	export_partdevice partdev 1 || rk3326_upgrade_abort 'boot partition unavailable'
+	mount -o rw,noatime "/dev/$partdev" /mnt || rk3326_upgrade_abort 'cannot restore configuration'
+	cp -f "$UPGRADE_BACKUP" "/mnt/$BACKUP_FILE" || failed=1
+	if [ -d /tmp/handheld-boot ]; then cp -Rf /tmp/handheld-boot/. /mnt/ || failed=1; fi
+	sync
+	umount /mnt || failed=1
+	[ "$failed" = 0 ] || rk3326_upgrade_abort 'configuration restore failed'
 }
 
 platform_do_upgrade() {
-	local diskdev partdev diff
-
-	export_bootdevice && export_partdevice diskdev 0 || {
-		echo "Unable to determine upgrade device"
-		return 1
-	}
-
+	local partdev part start size
+	platform_check_image "$1" || rk3326_upgrade_abort 'image or partition validation failed'
+	export_bootdevice || rk3326_upgrade_abort 'boot device unavailable'
 	sync
-
-	if [ "$UPGRADE_OPT_SAVE_PARTITIONS" = "1" ]; then
-		get_partitions "/dev/$diskdev" bootdisk
-
-		#extract the boot sector from the image
-		get_image "$@" | dd of=/tmp/image.bs count=1 bs=512b
-
-		get_partitions /tmp/image.bs image
-
-		#compare tables
-		diff="$(grep -F -x -v -f /tmp/partmap.bootdisk /tmp/partmap.image)"
-	else
-		diff=1
-	fi
-
-	if [ -n "$diff" ]; then
-		get_image "$@" | dd of="/dev/$diskdev" bs=4096 conv=fsync
-
-		# Separate removal and addtion is necessary; otherwise, partition 1
-		# will be missing if it overlaps with the old partition 2
-		partx -d - "/dev/$diskdev"
-		partx -a - "/dev/$diskdev"
-
-		return 0
-	fi
-
-	#iterate over each partition from the image and write it to the boot disk
-	while read part start size; do
-		if export_partdevice partdev $part; then
-			echo "Writing image to /dev/$partdev..."
-			get_image "$@" | dd of="/dev/$partdev" ibs="512" obs=1M skip="$start" count="$size" conv=fsync
-		else
-			echo "Unable to find partition $part device, skipped."
-		fi
+	while read -r part start size; do
+		export_partdevice partdev "$part" || rk3326_upgrade_abort "partition $part unavailable"
+		echo "Writing image to /dev/$partdev..."
+		(
+			set -o pipefail
+			rk3326_image_stream "$1" | {
+				dd of="/dev/$partdev" ibs=512 obs=1M skip="$start" count="$size" iflag=fullblock conv=fsync || exit 1
+				cat >/dev/null
+			}
+		) || rk3326_upgrade_abort "write failed on partition $part"
 	done < /tmp/partmap.image
-
-	#copy partition uuid
-	echo "Writing new UUID to /dev/$diskdev..."
-	get_image "$@" | dd of="/dev/$diskdev" bs=1 skip=440 count=4 seek=440 conv=fsync
+	# boot.scr discovers PARTUUID at boot. Preserve the existing disk signature,
+	# bootloader and any additional games partition instead of changing them.
+	sync
 }
