@@ -8,6 +8,8 @@ config = dict(line.split("=", 1) for line in Path(".config").read_text().splitli
 required = [
     "TARGET_rk3326", "TARGET_rk3326_generic", "TARGET_ROOTFS_SQUASHFS", "PACKAGE_luci", "PACKAGE_e2fsprogs",
     "IMAGEOPT", "PREINITOPT",
+    "PACKAGE_block-mount", "PACKAGE_kmod-fs-exfat", "PACKAGE_exfat-mkfs",
+    "PACKAGE_exfat-fsck", "PACKAGE_sfdisk", "PACKAGE_partx-utils",
     "PACKAGE_rk3326-handheld", "PACKAGE_emulationstation", "PACKAGE_retroarch",
     "PACKAGE_libretro-gambatte", "PACKAGE_libsdl2-image", "PACKAGE_libjpeg-turbo", "PACKAGE_libwebp", "PACKAGE_libmesa-rk3326", "PACKAGE_libsdl2-rk3326",
     "PACKAGE_trusted-firmware-a-rk3326", "PACKAGE_uboot-rk3326-legacy",

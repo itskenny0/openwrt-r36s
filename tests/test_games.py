@@ -21,7 +21,7 @@ class LaunchTests(unittest.TestCase):
         self.root = Path(temp.name)
         self.env = dict(os.environ, FIXTURE=str(self.root))
         for directory in ("usr/bin", "usr/lib/libretro", "usr/share/retroarch/system/PPSSPP",
-                          "etc/config", "lib", "proc", "roms", "tmp/handheld", "var/lock"):
+                          "etc/config", "lib", "proc", "easyroms", "tmp/handheld", "var/lock"):
             (self.root / directory).mkdir(parents=True)
         self.write("usr/share/retroarch/systems.tsv", (FILES / "systems.tsv").read_text())
         for name in ("gambatte", "snes9x", "genesis_plus_gx", "mednafen_pce_fast", "ppsspp"):
@@ -51,11 +51,12 @@ sys.exit(int(os.environ.get("CORE_EXIT", 0)))
 ''', executable=True)
         for name in ("handheld-retroarch", "handheld-game-dirs"):
             script = (FILES / name).read_text()
-            for prefix in ("/usr/", "/etc/", "/roms", "/tmp/handheld", "/var/lock", "/lib/functions.sh", "/proc/mounts"):
+            for prefix in ("/usr/", "/etc/", "/easyroms", "/tmp/handheld", "/var/lock", "/lib/functions.sh", "/proc/mounts"):
                 script = script.replace(prefix, str(self.root) + prefix)
             self.write("usr/bin/" + name, script, executable=True)
+        self.write("proc/mounts", f"/dev/card {self.root}/easyroms exfat rw 0 0\n")
         self.env["PATH"] = str(self.root / "usr/bin") + os.pathsep + self.env["PATH"]
-        self.rom = self.root / "roms/a game 'with quotes' $(touch INJECTED).gb"
+        self.rom = self.root / "easyroms/a game 'with quotes' $(touch INJECTED).gb"
         self.rom.write_text("test content")
 
     def write(self, name, text, executable=False):
@@ -78,11 +79,11 @@ sys.exit(int(os.environ.get("CORE_EXIT", 0)))
         self.assertEqual(args[-1], str(self.rom))
         self.assertFalse((self.root / "INJECTED").exists())
         config = self.root / "tmp/handheld/retroarch-display.cfg"
-        self.assertIn('/roms/saves/gb"', config.read_text())
+        self.assertIn('/easyroms/saves/gb"', config.read_text())
         self.assertIn('video_rotation = "1"', config.read_text())
         self.launch("snes")
-        self.assertIn('/roms/saves/snes"', config.read_text())
-        self.assertIn('/roms/states/snes"', config.read_text())
+        self.assertIn('/easyroms/saves/snes"', config.read_text())
+        self.assertIn('/easyroms/states/snes"', config.read_text())
 
     def test_missing_core_rom_and_unknown_system(self):
         self.launch("../invalid", expected=1)
@@ -98,13 +99,13 @@ sys.exit(int(os.environ.get("CORE_EXIT", 0)))
     def test_required_bios_and_psp_assets(self):
         self.launch("pcenginecd", expected=1)
         self.assertIn("syscard3.pce", self.error())
-        self.write("roms/bios/syscard3.pce", "user BIOS")
+        self.write("easyroms/bios/syscard3.pce", "user BIOS")
         self.launch("pcenginecd")
         self.launch("segacd", expected=1)
-        self.write("roms/bios/bios_CD_U.bin", "user BIOS")
+        self.write("easyroms/bios/bios_CD_U.bin", "user BIOS")
         self.launch("segacd")
         self.launch("psp")
-        assets = self.root / "roms/bios/PPSSPP"
+        assets = self.root / "easyroms/bios/PPSSPP"
         self.assertTrue(assets.is_symlink())
         assets.unlink()
         assets.mkdir()
@@ -124,7 +125,7 @@ sys.exit(int(os.environ.get("CORE_EXIT", 0)))
     def test_assets_on_filesystems_without_symlinks(self):
         self.write("usr/bin/ln", "#!/bin/sh\nexit 1\n", executable=True)
         self.launch("psp")
-        assets = self.root / "roms/bios/PPSSPP"
+        assets = self.root / "easyroms/bios/PPSSPP"
         self.assertFalse(assets.is_symlink())
         self.assertEqual((assets / "compat.ini").read_text(), "fixture")
         (assets / "compat.ini").write_text("user assets")
@@ -132,26 +133,25 @@ sys.exit(int(os.environ.get("CORE_EXIT", 0)))
         self.assertEqual((assets / "compat.ini").read_text(), "user assets")
 
     def test_missing_games_card_does_not_create_fallback_saves(self):
-        self.write("etc/config/fstab", "configured games card")
-        self.write("lib/functions.sh", '''
-config_load() { :; }
-config_foreach() { "$1" games; }
-config_get() { export "$1=$FIXTURE/roms"; }
-config_get_bool() { export "$1=1"; }
-''')
         self.write("proc/mounts", "")
         self.launch(expected=1)
         self.assertIn("Game storage", self.error())
-        self.assertFalse((self.root / "roms/saves").exists())
-        self.write("proc/mounts", f"/dev/card {self.root}/roms ext4 rw 0 0\n")
+        self.assertFalse((self.root / "easyroms/saves").exists())
+        self.write("proc/mounts", f"/dev/card {self.root}/easyroms ext4 rw 0 0\n")
         self.launch()
 
+    def test_readonly_games_volume_blocks_launch(self):
+        self.write("proc/mounts", f"/dev/card {self.root}/easyroms exfat ro 0 0\n")
+        self.launch(expected=1)
+        self.assertIn("Game storage", self.error())
+        self.assertFalse((self.root / "easyroms/saves").exists())
+
     def test_low_save_space_prevents_launch(self):
-        self.write("usr/bin/df", "#!/bin/sh\necho '/dev/card 100000 99000 1000 99% /roms'\n", executable=True)
+        self.write("usr/bin/df", "#!/bin/sh\necho '/dev/card 100000 99000 1000 99% /easyroms'\n", executable=True)
         self.launch(expected=1)
         self.assertIn("16 MiB", self.error())
         self.assertFalse((self.root / "arguments.json").exists())
-        self.assertFalse(list((self.root / "roms/saves/gb").glob(".save-check.*")))
+        self.assertFalse(list((self.root / "easyroms/saves/gb").glob(".save-check.*")))
 
     def test_service_stop_reaches_running_game_session(self):
         # Model SDL queuing a quit while ES is waiting on its game child.

@@ -21,9 +21,13 @@ work.mkdir(parents=True, exist_ok=True)
 if root.exists():
     shutil.rmtree(root)
 shutil.copytree(source, root, symlinks=True)
-for path in ('test', 'roms/gb'):
+for path in ('test', 'easyroms/gb'):
     (root / path).mkdir(parents=True, exist_ok=True)
 (work / 'proot-tmp').mkdir(exist_ok=True)
+# The test volume is a directory; substitute only the kernel mount table.
+(root / "test/mounts").write_text("/dev/test /easyroms exfat rw,noatime 0 0\n")
+guard = root / "usr/bin/handheld-game-dirs"
+guard.write_text(guard.read_text().replace("/proc/mounts", "/test/mounts"))
 env = dict(os.environ, PROOT_TMP_DIR=str(work / 'proot-tmp'), TMPDIR=str(work))
 
 
@@ -37,7 +41,7 @@ def write(path, text, executable=False):
 spec = importlib.util.spec_from_file_location('roms', ROOT / 'tests/runtime/roms.py')
 roms = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(roms)
-(root / 'roms/gb/runtime.gb').write_bytes(roms.game_boy())
+(root / 'easyroms/gb/runtime.gb').write_bytes(roms.game_boy())
 config = (root / 'etc/retroarch.cfg').read_text()
 for setting in ('video_driver', 'audio_driver', 'input_driver', 'input_joypad_driver'):
     config = re.sub(rf'^{setting}\s*=.*$', f'{setting} = "null"', config, flags=re.MULTILINE)
@@ -52,7 +56,7 @@ exec /usr/bin/retroarch.real --verbose "$@"
 write('usr/bin/emulationstation', '''#!/bin/sh
 trap ':' TERM
 echo "$$" > /test/session-pid
-/usr/bin/handheld-retroarch gb /roms/gb/runtime.gb &
+/usr/bin/handheld-retroarch gb /easyroms/gb/runtime.gb &
 game=$!
 wait "$game" || wait "$game"
 ''', executable=True)
@@ -82,7 +86,7 @@ for attempt, marker in enumerate((0x5a, 0x5b), 1):
             time.sleep(2)
             os.kill(int((root / 'test/supervisor-pid').read_text()), signal.SIGTERM)
             assert process.wait(timeout=30) == 0, 'Supervisor failed to stop'
-            save = (root / 'roms/saves/gb/runtime.srm').read_bytes()
+            save = (root / 'easyroms/saves/gb/runtime.srm').read_bytes()
             assert len(save) == 8192 and save[0] == marker, 'Shutdown did not flush/reload cartridge RAM'
             assert '[SRAM] Saved successfully' in logpath.read_text(), 'Missing save completion'
         finally:

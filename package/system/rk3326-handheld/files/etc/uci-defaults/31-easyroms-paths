@@ -1,0 +1,11 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# Retained frontend configuration from earlier releases uses /roms.
+if [ -f /etc/retroarch.cfg ]; then
+	sed -i '/^[[:space:]]*\(system_directory\|savefile_directory\|savestate_directory\)[[:space:]]*=/s|"/roms\([/"]\)|"/easyroms\1|g' /etc/retroarch.cfg || exit 1
+fi
+for config in /etc/emulationstation/es_systems.cfg /root/.emulationstation/es_systems.cfg; do
+	[ -f "$config" ] || continue
+	sed -i 's|<path>/roms/|<path>/easyroms/|g' "$config" || exit 1
+done
+exit 0

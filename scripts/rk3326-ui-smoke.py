@@ -27,9 +27,13 @@ work.mkdir(parents=True, exist_ok=True)
 if root.exists():
     shutil.rmtree(root)
 shutil.copytree(source, root, symlinks=True)
-for path in ("test", "root/.emulationstation", "roms/gb"):
+for path in ("test", "root/.emulationstation", "easyroms/gb"):
     (root / path).mkdir(parents=True, exist_ok=True)
 (work / "proot-tmp").mkdir(exist_ok=True)
+# The test volume is a directory; substitute only the kernel mount table.
+(root / "test/mounts").write_text("/dev/test /easyroms exfat rw,noatime 0 0\n")
+guard = root / "usr/bin/handheld-game-dirs"
+guard.write_text(guard.read_text().replace("/proc/mounts", "/test/mounts"))
 env = dict(os.environ, STAGING_DIR=str(stage), PROOT_TMP_DIR=str(work / "proot-tmp"), TMPDIR=str(work))
 
 
@@ -165,7 +169,7 @@ if scenario == "settings":
 spec = importlib.util.spec_from_file_location("roms", ROOT / "tests/runtime/roms.py")
 roms = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(roms)
-(root / "roms/gb/runtime.gb").write_bytes(roms.game_boy())
+(root / "easyroms/gb/runtime.gb").write_bytes(roms.game_boy())
 config = (root / "etc/retroarch.cfg").read_text()
 for setting in ("video_driver", "audio_driver", "input_driver", "input_joypad_driver"):
     config = re.sub(rf'^{setting}\s*=.*$', f'{setting} = "null"', config, flags=re.MULTILINE)
@@ -185,7 +189,7 @@ frontend("game", """3 A
 17 A
 18 quit
 """, "gb")
-save = (root / "roms/saves/gb/runtime.srm").read_bytes()
+save = (root / "easyroms/saves/gb/runtime.srm").read_bytes()
 assert len(save) == 8192 and save[0] == 0x5b, "The frontend did not save and reload cartridge RAM across two launches"
 log = (work / "game.log").read_text()
 assert "launch terminated with nonzero exit code" in log, "Missing game was not reported"

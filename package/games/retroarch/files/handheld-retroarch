@@ -26,7 +26,7 @@ done < /usr/share/retroarch/systems.tsv
 [ -r "/usr/lib/libretro/${core}_libretro.so" ] || fail 'The emulator is missing. Reinstall its package or update the firmware.'
 /usr/bin/handheld-game-dirs || fail 'Game storage is not writable. Check the ROM card and free space.'
 # Check actual writes as a read-only mount or full card can otherwise lose saves.
-for path in "/roms/saves/$system" "/roms/states/$system"; do
+for path in "/easyroms/saves/$system" "/easyroms/states/$system"; do
 	df -Pk "$path" | awk 'END { exit ($4 < 16384) }' || fail 'Save storage needs at least 16 MiB free. Free space before playing.'
 	temporary=$(mktemp "$path/.save-check.XXXXXX") || fail 'Save storage is full or read-only. Free space before playing.'
 	if ! printf x > "$temporary"; then
@@ -37,17 +37,17 @@ for path in "/roms/saves/$system" "/roms/states/$system"; do
 done
 case "$system" in
 	segacd)
-		[ -s /roms/bios/bios_CD_E.bin ] || [ -s /roms/bios/bios_CD_U.bin ] || [ -s /roms/bios/bios_CD_J.bin ] ||
-			fail 'Sega CD needs a BIOS for the game region in /roms/bios: bios_CD_E.bin, bios_CD_U.bin or bios_CD_J.bin.' ;;
+		[ -s /easyroms/bios/bios_CD_E.bin ] || [ -s /easyroms/bios/bios_CD_U.bin ] || [ -s /easyroms/bios/bios_CD_J.bin ] ||
+			fail 'Sega CD needs a BIOS for the game region in /easyroms/bios: bios_CD_E.bin, bios_CD_U.bin or bios_CD_J.bin.' ;;
 	pcenginecd)
-		[ -s /roms/bios/syscard3.pce ] || fail 'PC Engine CD needs syscard3.pce in /roms/bios.' ;;
+		[ -s /easyroms/bios/syscard3.pce ] || fail 'PC Engine CD needs syscard3.pce in /easyroms/bios.' ;;
 	psp)
-		[ -s /roms/bios/PPSSPP/compat.ini ] || fail 'PSP assets are missing. Restore /roms/bios/PPSSPP from /usr/share/retroarch/system/PPSSPP.' ;;
+		[ -s /easyroms/bios/PPSSPP/compat.ini ] || fail 'PSP assets are missing. Restore /easyroms/bios/PPSSPP from /usr/share/retroarch/system/PPSSPP.' ;;
 esac
 cat > /tmp/handheld/retroarch-display.cfg <<EOF
 video_rotation = "$(handheld-rotation ccw)"
-savefile_directory = "/roms/saves/$system"
-savestate_directory = "/roms/states/$system"
+savefile_directory = "/easyroms/saves/$system"
+savestate_directory = "/easyroms/states/$system"
 EOF
 child=
 stop() {

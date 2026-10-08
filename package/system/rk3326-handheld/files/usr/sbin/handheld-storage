@@ -1,0 +1,188 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# Provision only the unused tail of the actual mounted OS card. Never format an
+# existing partition unless our durable journal records an interrupted format.
+set -e
+. /lib/functions.sh
+
+fail() {
+	echo "Game storage: $*" >&2
+	logger -t handheld-storage "$*"
+	exit 1
+}
+
+mounted() {
+	awk '$2 == "/easyroms" { found=1 } END { exit !found }' /proc/mounts
+}
+
+save_state() {
+	umask 077
+	printf 'v1 %s %s %s %s %s\n' "$disk_id" "$disk_size" "$rom_start" "$rom_size" "$1" > /etc/easyroms.state.new
+	sync
+	mv /etc/easyroms.state.new /etc/easyroms.state
+	sync
+	phase=$1
+}
+
+read_layout() {
+	[ "$(hexdump -v -s 510 -n 2 -e '2/1 "%02x"' "$disk")" = 55aa ] || fail 'The OS card does not have an MBR.'
+	# Both supported build/runtime architectures are little endian. Decode the
+	# sector fields explicitly so awk never interprets an unsigned LBA as signed.
+	layout=$(hexdump -v -s 446 -n 64 -e '16/1 "%u " "\n"' "$disk" | awk '
+		NF == 16 { printf "%u %u %.0f %.0f\n", $1, $5,
+			$9 + 256*$10 + 65536*$11 + 16777216*$12,
+			$13 + 256*$14 + 65536*$15 + 16777216*$16 }')
+	# The values are exclusively decimal integers generated above.
+	# shellcheck disable=SC2086
+	set -- $layout
+	[ "$#" = 16 ] || fail 'Cannot read the OS partition table.'
+	[ "$1" = 0 ] || [ "$1" = 128 ] || fail 'Invalid boot partition flags.'
+	[ "$2 $3 $4" = '12 65536 131072' ] || fail 'Unexpected boot partition layout.'
+	shift 4
+	[ "$1" = 0 ] || [ "$1" = 128 ] || fail 'Invalid root partition flags.'
+	[ "$2 $3 $4" = '131 262144 1048576' ] || fail 'Unexpected or resized root partition.'
+	shift 4
+	third="$1 $2 $3 $4"
+	shift 4
+	[ "$*" = '0 0 0 0' ] || fail 'An existing fourth partition occupies the card.'
+}
+
+filesystem_type() {
+	block info "$partition" 2>/dev/null | sed -n 's/.* TYPE="\([^"]*\)".*/\1/p'
+}
+
+configure_mount() {
+	uuid=$(block info "$partition" | sed -n 's/.* UUID="\([^"]*\)".*/\1/p')
+	case "$uuid" in ''|*[!0-9a-fA-F-]*) fail 'Cannot identify the exFAT volume.' ;; esac
+	uci -q batch <<UCI
+set fstab.easyroms=mount
+set fstab.easyroms.target='/easyroms'
+set fstab.easyroms.uuid='$uuid'
+set fstab.easyroms.fstype='exfat'
+set fstab.easyroms.options='rw,noatime,uid=0,gid=0,fmask=0022,dmask=0022,errors=remount-ro'
+set fstab.easyroms.enabled='1'
+set fstab.easyroms.handheld_managed='1'
+UCI
+	uci commit fstab
+	sync
+}
+
+mkdir -p /var/lock /easyroms
+exec 9>/var/lock/handheld-storage.lock
+flock -x 9
+mounted && exit 0
+
+# Respect manually selected games cards, including the previous /roms target.
+# This runs after UCI defaults and before the normal fstab service.
+configured=0
+legacy=0
+check_mount() {
+	# shellcheck disable=SC3043
+	local target enabled
+	config_get target "$1" target
+	config_get_bool enabled "$1" enabled 1
+	[ "$enabled" = 1 ] || return 0
+	case "$target" in
+		/roms|/roms/)
+			uci set "fstab.$1.target=/easyroms"
+			legacy=1
+			configured=1
+			;;
+		/easyroms|/easyroms/) configured=1 ;;
+	esac
+}
+config_load fstab
+config_foreach check_mount mount
+if [ "$configured" = 1 ]; then
+	if [ "$legacy" = 1 ]; then uci commit fstab; sync; fi
+	block mount
+	mounted || fail 'The configured games card is missing or could not be mounted at /easyroms.'
+	exit 0
+fi
+# Preserve files on an older installation until its owner moves them. Do not
+# hide them beneath a new mount or silently start with an empty save directory.
+if [ -d /roms ] && [ ! -L /roms ] && [ -n "$(ls -A /roms)" ]; then
+	mount -o bind /roms /easyroms || fail 'Cannot expose the existing /roms directory.'
+	logger -t handheld-storage 'Using existing /roms data at /easyroms; automatic partitioning skipped.'
+	exit 0
+fi
+
+# /rom is the mounted squashfs partition after OpenWrt switches to its overlay.
+# Resolve its kernel device number, rather than guessing mmcblk0 or searching
+# for a PARTUUID that may also occur on an inserted clone of the OS card.
+root_dev=$(awk '$5 == "/rom" { for (i=6; i<=NF; i++) if ($i == "-" && $(i+1) == "squashfs") print $3 }' /proc/self/mountinfo)
+case "$root_dev" in ''|*[!0-9:]*) fail 'Cannot identify the mounted OS partition.' ;; esac
+root_path=$(readlink -f "/sys/dev/block/$root_dev")
+if [ ! -f "$root_path/partition" ] || [ "$(cat "$root_path/partition")" != 2 ]; then fail 'The mounted OS is not partition 2.'; fi
+[ "$(cat "$root_path/start") $(cat "$root_path/size")" = '262144 1048576' ] || fail 'The mounted root partition has an unexpected size.'
+disk_name=${root_path%/*}
+disk_name=${disk_name##*/}
+case "$disk_name" in mmcblk[0-9]|mmcblk[0-9][0-9]) ;; *) fail 'The OS is not on an MMC/SD card.' ;; esac
+disk="/dev/$disk_name"
+partition="${disk}p3"
+[ -b "$disk" ] || fail 'The OS card is unavailable.'
+[ "$(cat "/sys/class/block/$disk_name/queue/logical_block_size")" = 512 ] || fail 'Unsupported card sector size.'
+[ "$(cat "/sys/class/block/$disk_name/ro")" = 0 ] || fail 'The OS card is read-only.'
+disk_size=$(cat "/sys/class/block/$disk_name/size")
+case "$disk_size" in ''|*[!0-9]*) fail 'Cannot read the card capacity.' ;; esac
+# MBR has 32-bit LBA fields. Reject unsupported layouts instead of wrapping.
+[ "$disk_size" -le 4294967295 ] || fail 'This MBR image supports cards smaller than 2 TiB.'
+rom_start=1310720
+rom_size=$((disk_size - rom_start))
+[ "$rom_size" -ge 131072 ] || fail 'At least 64 MiB of unused card space is required.'
+disk_id=$(hexdump -v -s 440 -n 4 -e '4/1 "%02x"' "$disk")
+read_layout
+
+phase=none
+if [ -f /etc/easyroms.state ]; then
+	IFS=' ' read -r version saved_id saved_disk saved_start saved_size phase extra < /etc/easyroms.state || fail 'Incomplete storage journal.'
+	if [ "$version $saved_id $saved_disk $saved_start $saved_size" != "v1 $disk_id $disk_size $rom_start $rom_size" ] || [ -n "$extra" ]; then fail 'The storage journal does not match this card.'; fi
+	case "$phase" in planned|formatting|ready) ;; *) fail 'Invalid storage journal phase.' ;; esac
+fi
+
+if [ "$third" = '0 0 0 0' ]; then
+	case "$phase" in none|planned) ;; *) fail 'The previously created games partition is missing.' ;; esac
+	save_state planned
+	# Change only entry 3. Never ask the kernel to re-read partitions 1/2, which
+	# are mounted. Never erase filesystem signatures while editing the table.
+	printf 'start=%s, size=%s, type=7\n' "$rom_start" "$rom_size" |
+		sfdisk --no-reread --no-tell-kernel --wipe never --wipe-partitions never -N 3 "$disk" || fail 'Cannot add the games partition.'
+	sync
+	read_layout
+fi
+[ "$third" = "0 7 $rom_start $rom_size" ] || fail 'An existing third partition has a different layout; it will not be modified.'
+
+if [ ! -b "$partition" ]; then
+	partx --add --nr 3 "$disk" || fail 'Cannot register the games partition with the kernel.'
+	for attempt in $(seq 1 50); do
+		[ -b "$partition" ] && break
+		sleep 0.1
+	done
+fi
+[ -b "$partition" ] || fail 'The games partition device did not appear.'
+[ "$(cat "/sys/class/block/${disk_name}p3/start") $(cat "/sys/class/block/${disk_name}p3/size")" = "$rom_start $rom_size" ] || fail 'The kernel partition layout does not match the card.'
+# Never format a mounted volume, including one mounted at a different path.
+part_dev=$(cat "/sys/class/block/${disk_name}p3/dev")
+awk -v dev="$part_dev" '$3 == dev { found=1 } END { exit found ? 0 : 1 }' /proc/self/mountinfo && fail 'The games partition is already mounted elsewhere.'
+
+type=$(filesystem_type)
+if [ "$phase" = formatting ]; then
+	# No mount is permitted before ready has been durably written. Repeating an
+	# interrupted initial format therefore cannot erase games written by us.
+	mkfs.exfat -L EASYROMS "$partition" || fail 'Formatting interrupted; setup will retry on the next boot.'
+elif [ "$type" != exfat ]; then
+	if [ "$phase" != planned ] || [ -n "$type" ]; then fail 'An existing non-exFAT or damaged partition will not be formatted.'; fi
+	save_state formatting
+	mkfs.exfat -L EASYROMS "$partition" || fail 'Formatting interrupted; setup will retry on the next boot.'
+fi
+[ "$(filesystem_type)" = exfat ] || fail 'The games filesystem is not exFAT.'
+# Check a newly created/adopted volume before making it available. Subsequent
+# boots use fstab directly and do not scan the whole card during startup.
+if [ "$phase" != ready ]; then
+	fsck.exfat -n "$partition" || fail 'The games filesystem needs repair; it will not be formatted.'
+	save_state ready
+fi
+configure_mount
+block mount
+mounted || fail 'The exFAT games partition could not be mounted at /easyroms.'
+logger -t handheld-storage 'The EASYROMS exFAT partition is ready at /easyroms.'

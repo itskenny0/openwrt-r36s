@@ -23,7 +23,7 @@ for line in registry.read_text().splitlines():
         continue
     ident, name, platform, theme, core, extensions = line.split("|")
     suffixes = ["." + ext for ext in extensions.split()]
-    add(name=ident, fullname=name, path="/roms/" + ident,
+    add(name=ident, fullname=name, path="/easyroms/" + ident,
         extension=" ".join(suffixes + [ext.upper() for ext in suffixes]),
         command=f"/usr/bin/handheld-retroarch {ident} %ROM%", platform=platform, theme=theme)
 ET.indent(systems, space="  ")

@@ -79,7 +79,7 @@ int SDL_PollEvent(SDL_Event *event) {
         memset(event, 0, sizeof(*event));
         if (!strcmp(command, "quit")) { event->type = SDL_QUIT; return 1; }
         if (!strcmp(command, "remove-game")) {
-            if (unlink("/roms/gb/runtime.gb")) exit(26);
+            if (unlink("/easyroms/gb/runtime.gb")) exit(26);
             return real_poll(event);
         }
         key = SDL_GetKeyFromName(command);

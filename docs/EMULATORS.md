@@ -2,7 +2,7 @@
 
 The image installs RetroArch and the following cores. Put your own games in the corresponding folder, then restart EmulationStation. Empty systems are hidden. File extensions are accepted in lower or upper case. The image contains no game ROMs or commercial BIOS files.
 
-| System | Folder under `/roms` | Core | Formats |
+| System | Folder under `/easyroms` | Core | Formats |
 | --- | --- | --- | --- |
 | Game Boy / Game Boy Color | `gb` / `gbc` | Gambatte | `.gb` / `.gbc` |
 | NES / Famicom Disk System | `nes` | FCEUmm | `.nes`, `.fds`, `.unif`, `.unf` |
@@ -23,15 +23,15 @@ Keep disc track files alongside their `.cue` or `.gdi` descriptor. For multidisc
 
 ## BIOS and support files
 
-Put BIOS files in `/roms/bios`. Names are case sensitive. Sega CD requires `bios_CD_U.bin`, `bios_CD_E.bin` or `bios_CD_J.bin` for the game's region; PC Engine CD requires `syscard3.pce`. Famicom Disk System uses `disksys.rom`. PCSX ReARMed and Flycast provide high-level BIOS emulation, but some games need a compatible original BIOS. Neo Geo games need the matching `neogeo.zip` alongside the game archive or in the core's BIOS search location.
+Put BIOS files in `/easyroms/bios`. Names are case sensitive. Sega CD requires `bios_CD_U.bin`, `bios_CD_E.bin` or `bios_CD_J.bin` for the game's region; PC Engine CD requires `syscard3.pce`. Famicom Disk System uses `disksys.rom`. PCSX ReARMed and Flycast provide high-level BIOS emulation, but some games need a compatible original BIOS. Neo Geo games need the matching `neogeo.zip` alongside the game archive or in the core's BIOS search location.
 
-PPSSPP's redistributable fonts and support files are installed in `/usr/share/retroarch/system/PPSSPP`. The launcher links them into `/roms/bios/PPSSPP` when that path is absent, or copies them on FAT/exFAT cards. FinalBurn Neo's high-score database is installed similarly under `fbneo`. Existing user directories are preserved. This also works after mounting a separate games card at `/roms`.
+PPSSPP's redistributable fonts and support files are installed in `/usr/share/retroarch/system/PPSSPP`. The launcher links them into `/easyroms/bios/PPSSPP` when that path is absent, or copies them on FAT/exFAT cards. FinalBurn Neo's high-score database is installed similarly under `fbneo`. Existing user directories are preserved. This also works after mounting a separate games card at `/easyroms`.
 
 ## Controls and saves
 
 Default handheld mappings use **Select + Start** to exit, **Select + X** for the RetroArch menu, **Select + L** to load a state and **Select + R** to save a state. Check the active controller's mapping before relying on save-state shortcuts. Exit the emulator and shut down through EmulationStation before removing a card or cutting power.
 
-Battery saves and memory cards use `/roms/saves/<system>`; save states use `/roms/states/<system>`. Systems have separate directories, so identically named games from different systems do not share saves. RetroArch periodically flushes cartridge save RAM and saves again on a normal exit. Emulator save states are tied to the core and its version; keep in-game saves as well.
+Battery saves and memory cards use `/easyroms/saves/<system>`; save states use `/easyroms/states/<system>`. Systems have separate directories, so identically named games from different systems do not share saves. RetroArch periodically flushes cartridge save RAM and saves again on a normal exit. Emulator save states are tied to the core and its version; keep in-game saves as well.
 
 Global settings live in `/etc/retroarch.cfg`, core defaults in `/etc/retroarch-core-options.cfg`, and per-game/core overrides in `/root/.config/retroarch`. These settings survive a configuration-preserving sysupgrade. ROMs, artwork, BIOS files and saves on the OS card are not part of OpenWrt's configuration backup; use a separate games card or back them up before upgrading.
 

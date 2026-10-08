@@ -2,7 +2,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=rk3326-handheld
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 PKG_LICENSE:=GPL-2.0-only
 
 include $(INCLUDE_DIR)/package.mk
@@ -11,7 +11,7 @@ define Package/rk3326-handheld
   SECTION:=utils
   CATEGORY:=Utilities
   TITLE:=RK3326 handheld integration
-  DEPENDS:=@TARGET_rk3326 +uci +ubus +procd +alsa-utils +dropbear +dnsmasq +uhttpd audio-support video-support input-support
+  DEPENDS:=@TARGET_rk3326 +uci +ubus +procd +alsa-utils +dropbear +dnsmasq +uhttpd +block-mount +kmod-fs-exfat +exfat-mkfs +exfat-fsck +sfdisk +partx-utils audio-support video-support input-support
 endef
 
 define Package/rk3326-handheld/conffiles

@@ -95,7 +95,7 @@ printf complete > "$FIXTURE/completed"
     def test_preserve_panel_configuration_and_disk_signature(self):
         # An extra games partition remains untouched.
         disk = bytearray(self.mbr)
-        disk[478 + 4] = 0x83
+        disk[478 + 4] = 0x07
         struct.pack_into('<II', disk, 478 + 8, 270000, 1000)
         self.write('dev/disk', disk)
         self.write('dev/disk3', b'games and saves')

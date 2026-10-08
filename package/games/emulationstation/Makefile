@@ -3,7 +3,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=emulationstation
 PKG_VERSION:=2026.07.03
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 PKG_SOURCE_VERSION:=1071b8358b316ebda837933150db949bda90495e
 PKG_SOURCE:=emulationstation-$(PKG_SOURCE_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/RetroPie/EmulationStation/tar.gz/$(PKG_SOURCE_VERSION)?

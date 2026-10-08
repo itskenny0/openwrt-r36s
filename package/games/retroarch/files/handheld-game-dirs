@@ -1,44 +1,27 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-2.0-only
 set -eu
-# Do not silently create a new save tree on the OS card when a configured
-# games card is absent. It would look like the user's existing saves vanished.
-if [ -f /etc/config/fstab ]; then
-	# shellcheck disable=SC1091
-	. /lib/functions.sh
-	check_games_mount() {
-		# shellcheck disable=SC3043
-		local target enabled
-		config_get target "$1" target
-		config_get_bool enabled "$1" enabled 1
-		[ "$enabled" = 1 ] || return 0
-		case "$target" in
-			/roms|/roms/)
-				awk '$2 == "/roms" { found=1 } END { exit !found }' /proc/mounts || {
-					echo 'The configured games card is not mounted at /roms.' >&2
-					exit 1
-				}
-				;;
-		esac
-	}
-	config_load fstab
-	config_foreach check_games_mount mount
-fi
-set -- /roms/bios /roms/saves /roms/states
+# A missing/unwritable games volume must never become a save directory on the
+# small OS overlay, even when first-boot provisioning did not finish.
+awk '$2 == "/easyroms" && $4 ~ /(^|,)rw(,|$)/ { found=1 } END { exit !found }' /proc/mounts || {
+	echo 'Game storage is not mounted read-write at /easyroms.' >&2
+	exit 1
+}
+set -- /easyroms/bios /easyroms/saves /easyroms/states
 while IFS='|' read -r system _; do
 	case "$system" in ''|'#'*) continue ;; esac
-	set -- "$@" "/roms/$system" "/roms/saves/$system" "/roms/states/$system"
+	set -- "$@" "/easyroms/$system" "/easyroms/saves/$system" "/easyroms/states/$system"
 done < /usr/share/retroarch/systems.tsv
 mkdir -p "$@"
 # Leave user-provided BIOS and asset directories intact, including on ROM cards.
 for assets in /usr/share/retroarch/system/*; do
 	[ -d "$assets" ] || continue
 	name=${assets##*/}
-	destination="/roms/bios/$name"
+	destination="/easyroms/bios/$name"
 	[ -e "$destination" ] || [ -L "$destination" ] && continue
 	ln -s "$assets" "$destination" 2>/dev/null && continue
 	# FAT/exFAT games cards cannot store symlinks. Publish a complete copy only.
-	temporary=$(mktemp -d "/roms/bios/.$name.XXXXXX")
+	temporary=$(mktemp -d "/easyroms/bios/.$name.XXXXXX")
 	if cp -R "$assets/." "$temporary/" && mv "$temporary" "$destination"; then
 		continue
 	fi

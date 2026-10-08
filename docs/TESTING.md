@@ -7,13 +7,13 @@ Record the release tag, image checksum, exact board/panel revision, SD card mode
 ## First boot checklist
 
 1. Cold boot on battery. Confirm the selected panel initializes without flickering, artifacts or incorrect rotation. Repeat with charging connected.
-2. Confirm EmulationStation appears and every button, D-pad direction and stick works. Check menu accept/back and Start. Confirm the correct mapping is used after reboot.
+2. Confirm the OS card has a third exFAT partition labeled `EASYROMS`, using its previously unused capacity and mounted read-write at `/easyroms`. Copy a file from a computer, then verify it and the partition UUID survive two cold boots. Confirm no partition is reformatted. Confirm EmulationStation appears and every button, D-pad direction and stick works. Check menu accept/back and Start. Confirm the correct mapping is used after reboot.
 3. Launch games from the [system list](EMULATORS.md), check audio/video and exit with Select + Start. Check in-game saves and save states survive exit, shutdown and reboot. Check Select + X opens RetroArch and returns to the game. Test N64, Dreamcast and PSP separately; record the title, core options, measured frame rate, audio glitches and session length. Test a missing BIOS and an invalid game file to confirm the error is visible and the frontend remains usable.
 4. Enable USB Ethernet in Start → Network Settings. On Linux, macOS and Windows, confirm enumeration, DHCP, ping, SSH and LuCI. Set a root password. Confirm the computer gets a DHCP lease in `192.168.77.100–249` on a fresh install, and SSH responds at `192.168.77.1`. Repeat cable unplug/replug and reboot with the setting enabled.
 5. Disable USB Ethernet and attach a supported USB Wi-Fi or Ethernet adapter. Use [Wi-Fi client setup](NETWORKING.md), verify an AP lease on `wwan`, internet access and a cold boot with the dongle inserted, then switch back. Test an AP using `192.168.1.0/24`; it must not conflict with the USB LAN. Test Bluetooth discovery/pairing with a supported adapter. Record chipset IDs and firmware errors from the kernel log.
 6. Check battery/charging information, speaker and headphone output, brightness and temperatures during an extended game session. Insert and remove headphones during playback; confirm automatic routing and that the volume buttons work in both the menu and a game. Change brightness in Display Settings. Reboot and verify volume and brightness persist.
 7. Shut down from EmulationStation and verify the PMIC turns the device off. Also hold the power button for two seconds during a game and confirm its save survives shutdown. A short press must not shut down. Do not use a hard power cut as a routine shutdown.
-8. Perform a configuration-preserving sysupgrade on a spare card. Confirm the panel override, USB mode, LuCI password and controller configuration survive. Test a reset upgrade separately. Test an absent configured games card: launching a game must fail instead of creating substitute saves on the OS card. Back up games and saves separately before all upgrades.
+8. Perform a configuration-preserving sysupgrade on a spare card. Confirm the panel override, USB mode, LuCI password and controller configuration survive. Test a reset upgrade separately; both upgrades must preserve the EASYROMS partition and its files. Test an absent configured games card: launching a game must fail instead of creating substitute saves on the OS card. Back up games and saves separately before all upgrades.
 
 Useful evidence over SSH:
 
@@ -21,6 +21,9 @@ Useful evidence over SSH:
 ubus call system board
 uname -a
 cat /proc/cmdline
+block info
+df -h /easyroms
+cat /etc/easyroms.state
 dmesg
 logread
 cat /sys/class/drm/card*-*/status
@@ -38,6 +41,8 @@ For a blank screen, inspect `boot.env` and the selected DTB on a computer first.
 The production configuration uses a zero-second U-Boot countdown, a raw arm64 kernel, no initramfs, no preinit wait, quiet console output, and built-in SD/MMC, regulators, display, Panfrost, input, audio and USB gadget support. The squashfs root uses Zstandard at level 3 to favor fast decompression. EmulationStation runs directly on KMS/DRM and waits for a connected display instead of sleeping for a fixed delay. It does not wait for DHCP, Wi-Fi, Bluetooth or an internet connection. Kernel debug information and verbose diagnostic facilities are disabled in the release configuration.
 
 Networking drivers are retained. No `lpj` shortcut, `rootwait` removal, blind asynchronous probing or aggressive frequency/voltage override is used: those can trade boot time for intermittent failures.
+
+The one-time EASYROMS partition creation and quick exFAT format add work to the first boot. Measure subsequent boots separately; they mount the existing volume without formatting or scanning the whole filesystem.
 
 There is **no measured boot-time claim yet**. Measure power-button press to the first interactive EmulationStation frame with video over at least ten cold boots. Report median and slowest time. Test USB host and saved gadget mode, with/without adapters, on the same SD card. Check the menu responds; a displayed splash alone is not a completed boot.
 

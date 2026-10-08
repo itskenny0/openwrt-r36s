@@ -22,7 +22,7 @@ In EmulationStation, press **Start → Network Settings → USB Ethernet**, enab
 
 The USB setting defaults to host mode so USB peripherals can be used. Disable USB Ethernet before connecting a Wi-Fi adapter to the same port. USB Wi-Fi client mode is supported; see [network setup](docs/NETWORKING.md) to provision a dongle before swapping the cable. Charging-only ports and cables cannot carry Ethernet. Linux/macOS use CDC ECM; the second USB configuration provides RNDIS for Windows. Host driver selection still needs hardware testing.
 
-Copy your games to the matching [system folders](docs/EMULATORS.md) under `/roms` over SSH/SCP, then restart EmulationStation to refresh the list. Select + Start exits RetroArch. Mount a separate games card at `/roms` using **LuCI → System → Mount Points** before copying games. The initial root partition is 512 MiB; it does not automatically fill the SD card.
+On first boot, the unused space after the fixed 512 MiB system partition becomes an **exFAT partition labeled EASYROMS**, mounted automatically at `/easyroms`. Copy games to its [system folders](docs/EMULATORS.md) over SSH/SCP or by inserting the card into a computer, then restart EmulationStation to refresh the list. Select + Start exits RetroArch. A separate games card can instead be selected in **LuCI → System → Mount Points**, using `/easyroms` as its target. See [storage setup and recovery](docs/STORAGE.md).
 
 Use **Start → Quit → Shutdown System**, or hold the power button for two seconds, before removing power. Volume buttons and headphone routing are handled by a background service. **Start → Display Settings** controls brightness; brightness and volume persist across boots. Suspend is not integrated. These hardware controls still require console testing.
 
