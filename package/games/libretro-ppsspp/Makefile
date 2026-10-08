@@ -36,6 +36,12 @@ CMAKE_OPTIONS += -DLIBRETRO=ON -DFORCED_CPU=aarch64 \
 	-DUSING_QT_UI=OFF -DUNITTEST=OFF -DSIMULATOR=OFF -DHEADLESS=OFF -DUSE_DISCORD=OFF \
 	-DCMAKE_POSITION_INDEPENDENT_CODE=ON
 
+define Build/Prepare
+	$(call Build/Prepare/Default)
+	printf '%s\n' 'const char *PPSSPP_GIT_VERSION = "v$(PKG_VERSION)";' \
+		'#define PPSSPP_GIT_VERSION_NO_UPDATE 1' > $(PKG_BUILD_DIR)/git-version.cpp
+endef
+
 define Package/libretro-ppsspp/install
 	$(INSTALL_DIR) $(1)/usr/lib/libretro $(1)/usr/share/licenses/libretro-ppsspp
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/lib/ppsspp_libretro.so $(1)/usr/lib/libretro/
