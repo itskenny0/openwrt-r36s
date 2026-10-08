@@ -22,10 +22,11 @@ jobs:
       - name: Check integration
         run: |
           python3 -m unittest discover -s tests -v
+          python3 scripts/rk3326-systems.py --check
           git diff --check
           shellcheck -s sh scripts/rk3326-*.sh scripts/gen_rk3326_image.sh
           shellcheck -s sh -e SC1091,SC2034 package/system/rk3326-handheld/files/etc/init.d/* package/system/rk3326-handheld/files/usr/sbin/* package/system/rk3326-handheld/files/usr/libexec/* package/games/emulationstation/files/etc/init.d/* package/games/emulationstation/files/usr/bin/*
-          shellcheck -s sh package/games/retroarch/files/handheld-retroarch
+          shellcheck -s sh package/games/retroarch/files/handheld-*
           shellcheck -s sh -e SC1091 package/system/rk3326-handheld/files/etc/uci-defaults/*
   build:
     needs: check
@@ -42,7 +43,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential clang flex bison g++ gawk gcc-multilib gettext git libncurses-dev libssl-dev python3 python3-setuptools python3-pyelftools python3-dev rsync swig unzip zlib1g-dev file wget curl libelf-dev device-tree-compiler qemu-user
+          sudo apt-get install -y build-essential clang flex bison g++ gawk gcc-multilib gettext git libncurses-dev libssl-dev python3 python3-setuptools python3-pyelftools python3-dev rsync swig unzip zlib1g-dev file wget curl libelf-dev device-tree-compiler qemu-user proot
       - name: Configure all handheld profiles
         run: ./scripts/rk3326-configure.sh all
       - name: Download sources
@@ -58,13 +59,15 @@ jobs:
           python3 scripts/rk3326-check-kernel.py build_dir/target-*/linux-rk3326*/linux-6.18.*/.config
           python3 scripts/rk3326-check-images.py bin/targets/rk3326/generic
           python3 scripts/rk3326-smoke.py
+          python3 scripts/rk3326-ui-smoke.py
           ./scripts/diffconfig.sh > bin/targets/rk3326/generic/build.config
           cp feeds.conf.default bin/targets/rk3326/generic/feeds.lock
           cp docs/TESTING.md bin/targets/rk3326/generic/TESTING.md
+          cp docs/EMULATORS.md bin/targets/rk3326/generic/EMULATORS.md
           git rev-parse HEAD > bin/targets/rk3326/generic/source.commit
           cd bin/targets/rk3326/generic
           tar -czf packages.tar.gz -C ../../../ packages targets/rk3326/generic/packages
-          sha256sum ./*.img.gz ./*.manifest build.config feeds.lock source.commit TESTING.md packages.tar.gz > SHA256SUMS
+          sha256sum ./*.img.gz ./*.manifest build.config feeds.lock source.commit TESTING.md EMULATORS.md packages.tar.gz > SHA256SUMS
       - name: Upload firmware and package feed
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -74,6 +77,16 @@ jobs:
             bin/packages/
           if-no-files-found: error
           compression-level: 0
+          retention-days: 14
+      - name: Upload rendered frontend checks
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: frontend-checks
+          path: |
+            .work/ui-smoke/*.png
+            .work/ui-smoke/*.log
+          if-no-files-found: ignore
           retention-days: 14
       - name: Upload build diagnostics
         if: failure()
@@ -105,4 +118,4 @@ jobs:
         run: |
           cd release/targets/rk3326/generic
           sha256sum -c SHA256SUMS
-          gh release create "$RELEASE_TAG" --verify-tag --prerelease --title "OpenWrt RK3326 $RELEASE_TAG" --notes-file "$GITHUB_WORKSPACE/docs/RELEASE.md" ./*.img.gz ./*.manifest ./SHA256SUMS ./build.config ./feeds.lock ./source.commit ./TESTING.md ./packages.tar.gz
+          gh release create "$RELEASE_TAG" --verify-tag --prerelease --title "OpenWrt RK3326 $RELEASE_TAG" --notes-file "$GITHUB_WORKSPACE/docs/RELEASE.md" ./*.img.gz ./*.manifest ./SHA256SUMS ./build.config ./feeds.lock ./source.commit ./TESTING.md ./EMULATORS.md ./packages.tar.gz

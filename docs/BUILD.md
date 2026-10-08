@@ -6,7 +6,7 @@ Use a Linux x86-64 build host. Ubuntu 24.04 is the CI reference. Allow at least 
 sudo apt-get update
 sudo apt-get install build-essential clang flex bison g++ gawk gcc-multilib gettext git \
   libncurses-dev libssl-dev python3 python3-setuptools python3-pyelftools python3-dev \
-  rsync swig unzip zlib1g-dev file wget curl libelf-dev device-tree-compiler qemu-user
+  rsync swig unzip zlib1g-dev file wget curl libelf-dev device-tree-compiler qemu-user proot
 git clone https://github.com/itskenny0/openwrt-r36s.git
 cd openwrt-r36s
 ./scripts/rk3326-configure.sh all
@@ -24,15 +24,17 @@ The 32 MiB region before the first partition reserves Rockchip bootloader slots:
 
 ```sh
 python3 -m unittest discover -s tests -v
+python3 scripts/rk3326-systems.py --check
 python3 scripts/rk3326-check-config.py
 python3 scripts/rk3326-check-kernel.py build_dir/target-*/linux-rk3326*/linux-6.18.*/.config
 python3 scripts/rk3326-check-images.py bin/targets/rk3326/generic
 python3 scripts/rk3326-smoke.py
+python3 scripts/rk3326-ui-smoke.py
 ```
 
 The image check expects all profiles. It checks fwtool metadata, the gzip stream, partition bounds, bootloader slots, squashfs magic, the arm64 kernel, U-Boot script checksum and every DTB in the FAT filesystem. The kernel check inspects the resolved configuration and fails if a boot-critical driver became a module or was dropped.
 
-The QEMU smoke check runs the actual ARM64 libraries and programs: a generated PNG decode, ten Game Boy frames from a small self-authored test program, audio callbacks, and frontend version/help paths. It does not emulate RK3326 display, input, audio or USB hardware.
+The QEMU smoke check loads every installed core, decodes original PNG/H.264 fixtures, checks PSP codecs, and renders an SDL/EGL/GLES framebuffer using Mesa softpipe. Original GB, NES, SNES, GBA, Mega Drive, PC Engine and PS1 programs exercise CPU execution, video, audio, cartridge RAM and save-state restoration. The UI test uses proot and SDL events to drive the actual EmulationStation menus, toggle USB Ethernet through a simulated helper boundary, launch a game with RetroArch, save and return, and show a missing-game error. Screenshots and logs are retained as CI artifacts. These tests do not emulate RK3326 display, input, audio or USB hardware, or establish game compatibility and speed.
 
 ## GitHub releases
 

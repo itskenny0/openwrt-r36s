@@ -19,6 +19,10 @@ required = [
     "PACKAGE_kmod-brcmfmac", "PACKAGE_kmod-esp8089", "BRCMFMAC_SDIO", "PACKAGE_wpad-basic-mbedtls",
 ]
 missing = [f"CONFIG_{name}=y" for name in required if config.get(f"CONFIG_{name}") != "y"]
+for package in Path("package/games").glob("libretro-*/Makefile"):
+    name = "CONFIG_PACKAGE_" + package.parent.name
+    if config.get(name) != "y":
+        missing.append(name + "=y")
 if config.get("CONFIG_TARGET_PREINIT_TIMEOUT") != "0":
     missing.append("CONFIG_TARGET_PREINIT_TIMEOUT=0")
 if missing:
