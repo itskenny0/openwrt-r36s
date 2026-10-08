@@ -27,8 +27,13 @@ done < /usr/share/retroarch/systems.tsv
 /usr/bin/handheld-game-dirs || fail 'Game storage is not writable. Check the ROM card and free space.'
 # Check actual writes as a read-only mount or full card can otherwise lose saves.
 for path in "/roms/saves/$system" "/roms/states/$system"; do
-	: > "$path/.write-test" || fail 'Save storage is full or read-only. Free space before playing.'
-	rm -f "$path/.write-test"
+	df -Pk "$path" | awk 'END { exit ($4 < 16384) }' || fail 'Save storage needs at least 16 MiB free. Free space before playing.'
+	temporary=$(mktemp "$path/.save-check.XXXXXX") || fail 'Save storage is full or read-only. Free space before playing.'
+	if ! printf x > "$temporary"; then
+		rm -f "$temporary"
+		fail 'Save storage is full or read-only. Free space before playing.'
+	fi
+	rm -f "$temporary"
 done
 case "$system" in
 	segacd)

@@ -1,6 +1,7 @@
 """Exercise game launches, save isolation and error reporting without hardware."""
 import json
 import os
+import signal
 from pathlib import Path
 import subprocess
 import tempfile
@@ -20,7 +21,7 @@ class LaunchTests(unittest.TestCase):
         self.root = Path(temp.name)
         self.env = dict(os.environ, FIXTURE=str(self.root))
         for directory in ("usr/bin", "usr/lib/libretro", "usr/share/retroarch/system/PPSSPP",
-                          "etc", "roms", "tmp/handheld", "var/lock"):
+                          "etc/config", "lib", "proc", "roms", "tmp/handheld", "var/lock"):
             (self.root / directory).mkdir(parents=True)
         self.write("usr/share/retroarch/systems.tsv", (FILES / "systems.tsv").read_text())
         for name in ("gambatte", "snes9x", "genesis_plus_gx", "mednafen_pce_fast", "ppsspp"):
@@ -42,7 +43,7 @@ sys.exit(int(os.environ.get("CORE_EXIT", 0)))
 ''', executable=True)
         for name in ("handheld-retroarch", "handheld-game-dirs"):
             script = (FILES / name).read_text()
-            for prefix in ("/usr/", "/etc/", "/roms", "/tmp/handheld", "/var/lock"):
+            for prefix in ("/usr/", "/etc/", "/roms", "/tmp/handheld", "/var/lock", "/lib/functions.sh", "/proc/mounts"):
                 script = script.replace(prefix, str(self.root) + prefix)
             self.write("usr/bin/" + name, script, executable=True)
         self.env["PATH"] = str(self.root / "usr/bin") + os.pathsep + self.env["PATH"]
@@ -121,6 +122,60 @@ sys.exit(int(os.environ.get("CORE_EXIT", 0)))
         (assets / "compat.ini").write_text("user assets")
         self.launch("psp")
         self.assertEqual((assets / "compat.ini").read_text(), "user assets")
+
+    def test_missing_games_card_does_not_create_fallback_saves(self):
+        self.write("etc/config/fstab", "configured games card")
+        self.write("lib/functions.sh", '''
+config_load() { :; }
+config_foreach() { "$1" games; }
+config_get() { export "$1=$FIXTURE/roms"; }
+config_get_bool() { export "$1=1"; }
+''')
+        self.write("proc/mounts", "")
+        self.launch(expected=1)
+        self.assertIn("Game storage", self.error())
+        self.assertFalse((self.root / "roms/saves").exists())
+        self.write("proc/mounts", f"/dev/card {self.root}/roms ext4 rw 0 0\n")
+        self.launch()
+
+    def test_low_save_space_prevents_launch(self):
+        self.write("usr/bin/df", "#!/bin/sh\necho '/dev/card 100000 99000 1000 99% /roms'\n", executable=True)
+        self.launch(expected=1)
+        self.assertIn("16 MiB", self.error())
+        self.assertFalse((self.root / "arguments.json").exists())
+        self.assertFalse(list((self.root / "roms/saves/gb").glob(".save-check.*")))
+
+    def test_service_stop_reaches_running_game_session(self):
+        # Model SDL queuing a quit while ES is waiting on its game child.
+        self.write("usr/bin/emulationstation", '''#!/bin/sh
+trap ':' TERM
+printf '%s' "$$" > "$FIXTURE/session-pid"
+"$FIXTURE/usr/bin/handheld-retroarch" gb "$TEST_ROM" &
+game=$!
+wait "$game" || wait "$game"
+''', executable=True)
+        source = ROOT / "package/games/emulationstation/files/usr/bin/emulationstation-session"
+        tail = "child=\n" + source.read_text().split("child=\n", 1)[1]
+        tail = tail.replace("/usr/bin/emulationstation", str(self.root / "usr/bin/emulationstation"))
+        tail = tail.replace(' < /dev/tty1 > /dev/tty1 2>&1', '').replace('setsid -c', 'setsid')
+        self.write("usr/bin/supervisor", "#!/bin/sh\nrotation=0\n" + tail, executable=True)
+        env = dict(self.env, WAIT_FOR_STOP="1", TEST_ROM=str(self.rom))
+        process = subprocess.Popen(['busybox', 'ash', self.root / 'usr/bin/supervisor'], env=env)
+        try:
+            deadline = time.monotonic() + 5
+            while not (self.root / "ready").exists():
+                self.assertIsNone(process.poll())
+                if time.monotonic() > deadline: self.fail("Game session did not start")
+                time.sleep(0.02)
+            process.terminate()
+            self.assertEqual(process.wait(timeout=5), 0)
+            self.assertEqual((self.root / "flushed").read_text(), "saved")
+        finally:
+            if process.poll() is None: process.kill(); process.wait()
+            pidfile = self.root / "session-pid"
+            if pidfile.exists():
+                try: os.killpg(int(pidfile.read_text()), signal.SIGKILL)
+                except ProcessLookupError: pass
 
     def test_shutdown_waits_for_emulator_save_flush(self):
         env = dict(self.env, WAIT_FOR_STOP="1")

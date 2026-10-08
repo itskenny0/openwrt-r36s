@@ -3,7 +3,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=retroarch
 PKG_VERSION:=1.22.2
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 PKG_SOURCE:=RetroArch-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/libretro/RetroArch/tar.gz/refs/tags/v$(PKG_VERSION)?
 PKG_HASH:=245ef18c8fa8fbd9fbb5eb25cf43e17c6aace2f95c1ed99873cbd794012bb232

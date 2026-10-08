@@ -1,6 +1,29 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-2.0-only
 set -eu
+# Do not silently create a new save tree on the OS card when a configured
+# games card is absent. It would look like the user's existing saves vanished.
+if [ -f /etc/config/fstab ]; then
+	# shellcheck disable=SC1091
+	. /lib/functions.sh
+	check_games_mount() {
+		# shellcheck disable=SC3043
+		local target enabled
+		config_get target "$1" target
+		config_get_bool enabled "$1" enabled 1
+		[ "$enabled" = 1 ] || return 0
+		case "$target" in
+			/roms|/roms/)
+				awk '$2 == "/roms" { found=1 } END { exit !found }' /proc/mounts || {
+					echo 'The configured games card is not mounted at /roms.' >&2
+					exit 1
+				}
+				;;
+		esac
+	}
+	config_load fstab
+	config_foreach check_games_mount mount
+fi
 set -- /roms/bios /roms/saves /roms/states
 while IFS='|' read -r system _; do
 	case "$system" in ''|'#'*) continue ;; esac
