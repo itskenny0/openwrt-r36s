@@ -1,0 +1,90 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+set -eu
+umask 077
+mkdir -p /var/lock
+exec 9>/var/lock/handheld-settings.lock
+flock -x 9
+
+percentage() {
+	case "$1" in ''|*[!0-9]*|????*) return 1 ;; esac
+	value=$1
+	while [ "${value#0}" != "$value" ]; do value=${value#0}; done
+	value=${value:-0}
+	[ "$value" -le 100 ]
+}
+
+backlight() {
+	for light in /sys/class/backlight/*; do
+		[ -w "$light/brightness" ] && [ -r "$light/max_brightness" ] && return 0
+	done
+	return 1
+}
+
+volume_get() {
+	amixer sget Master | sed -n 's/.*\[\([0-9]*\)%\].*/\1/p' | head -n 1
+}
+
+save_volume() {
+	current=$(volume_get)
+	percentage "$current" || return 1
+	[ "$(uci -q get handheld.audio.volume || true)" = "$value" ] && return 0
+	uci set handheld.audio=audio
+	uci set "handheld.audio.volume=$value"
+	if ! uci commit handheld; then
+		uci -q revert handheld.audio.volume || true
+		return 1
+	fi
+}
+
+brightness_set() {
+	percentage "$1" && [ "$value" -ge 5 ] && backlight || return 1
+	maximum=$(cat "$light/max_brightness")
+	[ "$maximum" -gt 0 ] || return 1
+	echo "$(((maximum * value + 99) / 100))" > "$light/brightness"
+}
+
+case "${1:-}" in
+	volume-get) volume_get ;;
+	volume-save) save_volume ;;
+	volume-set)
+		percentage "${2:-}" || exit 2
+		amixer -q sset Master "${value}%"
+		save_volume
+		;;
+	volume-step)
+		case "${2:-}" in up) step=5 ;; down) step=-5 ;; *) exit 2 ;; esac
+		current=$(volume_get)
+		percentage "$current" || exit 1
+		value=$((value + step))
+		[ "$value" -ge 0 ] || value=0
+		[ "$value" -le 100 ] || value=100
+		amixer -q sset Master "${value}%"
+		;;
+	brightness-get)
+		backlight || exit 1
+		maximum=$(cat "$light/max_brightness")
+		[ "$maximum" -gt 0 ] || exit 1
+		echo "$((($(cat "$light/brightness") * 100 + maximum / 2) / maximum))"
+		;;
+	brightness-set)
+		brightness_set "${2:-}" || exit 1
+		uci set handheld.display=display
+		uci set "handheld.display.brightness=$value"
+		if ! uci commit handheld; then
+			uci -q revert handheld.display.brightness || true
+			exit 1
+		fi
+		;;
+	route)
+		case "${2:-}" in headphones) route=HP ;; speaker) route=SPK ;; *) exit 2 ;; esac
+		amixer -q sset 'Playback Mux' "$route"
+		;;
+	restore)
+		percentage "$(uci -q get handheld.audio.volume || echo 70)" || value=70
+		amixer -q sset Master "${value}%"
+		amixer -q sset 'Playback Mux' SPK
+		brightness_set "$(uci -q get handheld.display.brightness || echo 50)"
+		;;
+	*) echo 'Usage: handheld-settings {volume-get|volume-save|volume-set 0..100|volume-step up|down|brightness-get|brightness-set 5..100|route speaker|headphones|restore}' >&2; exit 2 ;;
+esac

@@ -3,3 +3,9 @@ config usb 'usb'
 
 config frontend 'frontend'
 	option enabled '1'
+
+config audio 'audio'
+	option volume '70'
+
+config display 'display'
+	option brightness '50'

@@ -1,0 +1,90 @@
+--- a/es-app/src/guis/GuiMenu.cpp
++++ b/es-app/src/guis/GuiMenu.cpp
+@@ -24,6 +24,22 @@
+ #include "FileSorts.h"
+ #include "views/gamelist/IGameListView.h"
+ #include "guis/GuiInfoPopup.h"
++
++namespace {
++int handheldPercentage(const char* command, int fallback)
++{
++	char value[16] = {};
++	FILE* pipe = popen(command, "r");
++	if (!pipe) return fallback;
++	bool read = fgets(value, sizeof(value), pipe) != nullptr;
++	int status = pclose(pipe);
++	if (!read || status != 0) return fallback;
++	char* end = nullptr;
++	long parsed = strtol(value, &end, 10);
++	if (end == value || (*end != '\n' && *end != 0) || parsed < 0 || parsed > 100) return fallback;
++	return static_cast<int>(parsed);
++}
++}
+ 
+ GuiMenu::GuiMenu(Window* window) : GuiComponent(window), mMenu(window, "MAIN MENU"), mVersion(window)
+ {
+@@ -68,12 +84,44 @@
+ 			mWindow->pushGui(settings);
+ 		});
+ 		addEntry("SOUND SETTINGS", 0x777777FF, true, [this] { openSoundSettings(); });
++		addEntry("DISPLAY SETTINGS", 0x777777FF, true, [this] {
++			auto settings = new GuiSettings(mWindow, "DISPLAY SETTINGS");
++			auto brightness = std::make_shared<SliderComponent>(mWindow, 5.f, 100.f, 5.f, "%");
++			const int initial = handheldPercentage("/usr/sbin/handheld-settings brightness-get", 50);
++			brightness->setValue(initial);
++			settings->addWithLabel("BRIGHTNESS", brightness);
++			Window* window = mWindow;
++			settings->addSaveFunc([window, brightness, initial] {
++				int value = static_cast<int>(Math::round(brightness->getValue()));
++				if (value == initial) return;
++				std::string command = "/usr/sbin/handheld-settings brightness-set " + std::to_string(value);
++				if (system(command.c_str()) != 0)
++					window->pushGui(new GuiMsgBox(window, "BRIGHTNESS COULD NOT BE SAVED.", "OK"));
++			});
++			mWindow->pushGui(settings);
++		});
+ 		addEntry("UI SETTINGS", 0x777777FF, true, [this] { openUISettings(); });
+ 		addEntry("GAME COLLECTION SETTINGS", 0x777777FF, true, [this] { openCollectionSystemSettings(); });
+ 		addEntry("OTHER SETTINGS", 0x777777FF, true, [this] { openOtherSettings(); });
+ 		addEntry("CONFIGURE INPUT", 0x777777FF, true, [this] { openConfigInput(); });
+ 	} else {
+ 		addEntry("SOUND SETTINGS", 0x777777FF, true, [this] { openSoundSettings(); });
++		addEntry("DISPLAY SETTINGS", 0x777777FF, true, [this] {
++			auto settings = new GuiSettings(mWindow, "DISPLAY SETTINGS");
++			auto brightness = std::make_shared<SliderComponent>(mWindow, 5.f, 100.f, 5.f, "%");
++			const int initial = handheldPercentage("/usr/sbin/handheld-settings brightness-get", 50);
++			brightness->setValue(initial);
++			settings->addWithLabel("BRIGHTNESS", brightness);
++			Window* window = mWindow;
++			settings->addSaveFunc([window, brightness, initial] {
++				int value = static_cast<int>(Math::round(brightness->getValue()));
++				if (value == initial) return;
++				std::string command = "/usr/sbin/handheld-settings brightness-set " + std::to_string(value);
++				if (system(command.c_str()) != 0)
++					window->pushGui(new GuiMsgBox(window, "BRIGHTNESS COULD NOT BE SAVED.", "OK"));
++			});
++			mWindow->pushGui(settings);
++		});
+ 	}
+ 
+ 	addEntry("QUIT", 0x777777FF, true, [this] {openQuitMenu(); });
+@@ -127,9 +175,17 @@
+ 
+ 	// volume
+ 	auto volume = std::make_shared<SliderComponent>(mWindow, 0.f, 100.f, 1.f, "%");
+-	volume->setValue((float)VolumeControl::getInstance()->getVolume());
++	const int initialVolume = handheldPercentage("/usr/sbin/handheld-settings volume-get", 70);
++	volume->setValue(initialVolume);
+ 	s->addWithLabel("SYSTEM VOLUME", volume);
+-	s->addSaveFunc([volume] { VolumeControl::getInstance()->setVolume((int)Math::round(volume->getValue())); });
++	Window* window = mWindow;
++	s->addSaveFunc([window, volume, initialVolume] {
++		int value = static_cast<int>(Math::round(volume->getValue()));
++		if (value == initialVolume) return;
++		std::string command = "/usr/sbin/handheld-settings volume-set " + std::to_string(value);
++		if (system(command.c_str()) != 0)
++			window->pushGui(new GuiMsgBox(window, "VOLUME COULD NOT BE SAVED.", "OK"));
++	});
+ 
+ 	if (UIModeController::getInstance()->isUIModeFull())
+ 	{
