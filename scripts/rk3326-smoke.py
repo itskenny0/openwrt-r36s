@@ -13,7 +13,8 @@ rootfs = ROOT / "build_dir/target-aarch64_cortex-a35_musl/root-rk3326"
 preinit = (rootfs / "lib/preinit/00_preinit.conf").read_text().splitlines()
 if "fs_failsafe_wait_timeout=0" not in preinit:
     raise SystemExit("Packaged preinit must not impose a failsafe countdown")
-for path in ("etc/rc.d/S25emulationstation", "etc/rc.d/S26usb-gadget",
+for path in ("etc/rc.d/S24handheld-controls", "usr/sbin/handheld-controls",
+             "usr/sbin/handheld-wifi", "usr/sbin/handheld-settings", "etc/rc.d/S25emulationstation", "etc/rc.d/S26usb-gadget",
              "www/cgi-bin/luci", "usr/libexec/handheld-usb-apply"):
     if not (rootfs / path).exists():
         raise SystemExit(f"Missing runtime integration: {path}")
@@ -38,13 +39,25 @@ def chunk(kind, data):
     return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
 
 
-# A generated 1x1 RGB image exercises FreeImage's decoder without external assets.
+# Original PNG fixtures exercise the artwork decoders without external assets.
 (work / "pixel.png").write_bytes(
     b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0))
     + chunk(b"IDAT", zlib.compress(b"\x00\x11\x22\x33")) + chunk(b"IEND", b""))
-for name, libraries in (("freeimage", ["-lfreeimage"]), ("libretro", ["-ldl"]),
+(work / "oversized.png").write_bytes(
+    b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 8192, 1, 8, 2, 0, 0, 0))
+    + chunk(b"IDAT", zlib.compress(b"\x00\x11\x22\x33")) + chunk(b"IEND", b""))
+if list((rootfs / "usr/lib").glob("libfreeimage*")):
+    raise SystemExit("The obsolete FreeImage decoder must not be included")
+es_source, = ROOT.glob("build_dir/target-*/EmulationStation-*")
+run(str(compiler).replace("-gcc", "-g++"), "-std=c++11", "-I" + str(stage / "usr/include/SDL2"),
+    "-I" + str(stage / "usr/include"), "-I" + str(es_source / "es-core/src"),
+    ROOT / "tests/runtime/artwork.cpp", es_source / "es-core/src/ImageIO.cpp",
+    "-L" + str(stage / "usr/lib"), "-Wl,-rpath-link," + str(stage / "usr/lib"),
+    "-lSDL2_image", "-lSDL2", "-lwebp", "-o", work / "artwork")
+run(*qemu, work / "artwork", work / "pixel.png", work / "oversized.png", work)
+for name, libraries in (("libretro", ["-ldl"]),
                         ("graphics", ["-lSDL2", "-lGLESv2"]),
-                        ("media", ["-lavcodec", "-lavformat", "-lavutil"])):
+                        ("media", ["-lavcodec", "-lavformat", "-lavutil"]), ("controls", [])):
     # Link against development files; image stripping removes ELF section tables.
     # Run against the final root filesystem to verify the shipped payload.
     run(compiler, "-I" + str(stage / "usr/include"), "-I" + str(header),
@@ -52,10 +65,7 @@ for name, libraries in (("freeimage", ["-lfreeimage"]), ("libretro", ["-ldl"]),
         "-L" + str(stage / "root-rk3326/usr/lib/libretro"), "-Wl,-rpath-link," + str(stage / "usr/lib"),
         *libraries, "-o", work / name)
     args = [work / name]
-    if name == "freeimage":
-        args.append(work / "pixel.png")
-        run(*qemu, *args)
-    elif name == "media":
+    if name in {"media", "controls"}:
         run(*qemu, *args)
     elif name == "graphics":
         run(*qemu, "-E", "SDL_VIDEODRIVER=offscreen", "-E", "EGL_PLATFORM=surfaceless",

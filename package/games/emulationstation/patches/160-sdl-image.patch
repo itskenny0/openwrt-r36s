@@ -1,0 +1,286 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -97,7 +97,7 @@
+ endif()
+ 
+ find_package(Freetype REQUIRED)
+-find_package(FreeImage REQUIRED)
++find_package(SDL2_image REQUIRED)
+ find_package(SDL2 REQUIRED)
+ find_package(CURL REQUIRED)
+ find_package(VLC REQUIRED)
+@@ -179,7 +179,7 @@
+ #add include directories
+ set(COMMON_INCLUDE_DIRS
+     ${FREETYPE_INCLUDE_DIRS}
+-    ${FreeImage_INCLUDE_DIRS}
++    
+     ${SDL2_INCLUDE_DIRS}
+     ${CURL_INCLUDE_DIR}
+     ${VLC_INCLUDE_DIR}
+@@ -217,7 +217,7 @@
+ 
+ set(COMMON_LIBRARIES
+     ${FREETYPE_LIBRARIES}
+-    ${FreeImage_LIBRARIES}
++    SDL2_image::SDL2_image
+     ${SDL2_LIBRARIES}
+     ${CURL_LIBRARIES}
+     ${VLC_LIBRARIES}
+--- a/es-app/src/main.cpp
++++ b/es-app/src/main.cpp
+@@ -28,7 +28,6 @@
+ #include <Windows.h>
+ #endif
+ 
+-#include <FreeImage.h>
+ 
+ bool scrape_cmdline = false;
+ 
+@@ -331,10 +330,6 @@
+ 	}
+ #endif
+ 
+-	// call this ONLY when linking with FreeImage as a static library
+-#ifdef FREEIMAGE_LIB
+-	FreeImage_Initialise();
+-#endif
+ 
+ 	//if ~/.emulationstation doesn't exist and cannot be created, bail
+ 	if(!verifyHomeFolderExists())
+@@ -494,10 +489,6 @@
+ 	waitForGamelistWrites();
+ 	SystemData::deleteSystems();
+ 
+-	// call this ONLY when linking with FreeImage as a static library
+-#ifdef FREEIMAGE_LIB
+-	FreeImage_DeInitialise();
+-#endif
+ 
+ 	processQuitMode();
+ 
+--- a/es-core/src/ImageIO.h
++++ b/es-core/src/ImageIO.h
+@@ -4,10 +4,12 @@
+ 
+ #include <stdlib.h>
+ #include <vector>
++#include <string>
+ 
+ class ImageIO
+ {
+ public:
++	static bool resizeFile(const std::string& path, int maxWidth, int maxHeight);
+ 	static std::vector<unsigned char> loadFromMemoryRGBA32(const unsigned char * data, const size_t size, size_t & width, size_t & height);
+ 	static void flipPixelsVert(unsigned char* imagePx, const size_t& width, const size_t& height);
+ };
+--- a/es-core/src/ImageIO.cpp
++++ b/es-core/src/ImageIO.cpp
+@@ -1,77 +1,65 @@
+ #include "ImageIO.h"
++#include <SDL_image.h>
++#include <algorithm>
++#include <cstring>
++#include <limits>
++#include <memory>
++#include <unistd.h>
+ 
+-#include "Log.h"
+-#include <FreeImage.h>
+-#include <string.h>
++namespace {
++using Surface = std::unique_ptr<SDL_Surface, decltype(&SDL_FreeSurface)>;
++Surface rgba(SDL_Surface* input)
++{
++	Surface original(input, SDL_FreeSurface);
++	return Surface(input ? SDL_ConvertSurfaceFormat(input, SDL_PIXELFORMAT_RGBA32, 0) : nullptr, SDL_FreeSurface);
++}
++}
+ 
+-std::vector<unsigned char> ImageIO::loadFromMemoryRGBA32(const unsigned char * data, const size_t size, size_t & width, size_t & height)
++std::vector<unsigned char> ImageIO::loadFromMemoryRGBA32(const unsigned char* data, const size_t size, size_t& width, size_t& height)
+ {
+-	std::vector<unsigned char> rawData;
+-	width = 0;
+-	height = 0;
+-	FIMEMORY * fiMemory = FreeImage_OpenMemory((BYTE *)data, (DWORD)size);
+-	if (fiMemory != nullptr) {
+-		//detect the filetype from data
+-		FREE_IMAGE_FORMAT format = FreeImage_GetFileTypeFromMemory(fiMemory);
+-		if (format != FIF_UNKNOWN && FreeImage_FIFSupportsReading(format))
+-		{
+-			//file type is supported. load image
+-			FIBITMAP * fiBitmap = FreeImage_LoadFromMemory(format, fiMemory);
+-			if (fiBitmap != nullptr)
+-			{
+-				//loaded. convert to 32bit if necessary
+-				if (FreeImage_GetBPP(fiBitmap) != 32)
+-				{
+-					FIBITMAP * fiConverted = FreeImage_ConvertTo32Bits(fiBitmap);
+-					if (fiConverted != nullptr)
+-					{
+-						//free original bitmap data
+-						FreeImage_Unload(fiBitmap);
+-						fiBitmap = fiConverted;
+-					}
+-				}
+-				if (fiBitmap != nullptr)
+-				{
+-					width = FreeImage_GetWidth(fiBitmap);
+-					height = FreeImage_GetHeight(fiBitmap);
+-					//loop through scanlines and add all pixel data to the return vector
+-					//this is necessary, because width*height*bpp might not be == pitch
+-					unsigned char * tempData = new unsigned char[width * height * 4];
+-					for (size_t i = 0; i < height; i++)
+-					{
+-						const BYTE * scanLine = FreeImage_GetScanLine(fiBitmap, (int)i);
+-						memcpy(tempData + (i * width * 4), scanLine, width * 4);
+-					}
+-					//convert from BGRA to RGBA
+-					for(size_t i = 0; i < width*height; i++)
+-					{
+-						RGBQUAD bgra = ((RGBQUAD *)tempData)[i];
+-						RGBQUAD rgba;
+-						rgba.rgbBlue = bgra.rgbRed;
+-						rgba.rgbGreen = bgra.rgbGreen;
+-						rgba.rgbRed = bgra.rgbBlue;
+-						rgba.rgbReserved = bgra.rgbReserved;
+-						((RGBQUAD *)tempData)[i] = rgba;
+-					}
+-					rawData = std::vector<unsigned char>(tempData, tempData + width * height * 4);
+-					//free bitmap data
+-					FreeImage_Unload(fiBitmap);
+-					delete[] tempData;
+-				}
+-			}
+-			else
+-			{
+-				LOG(LogError) << "Error - Failed to load image from memory!";
+-			}
+-		}
+-		else
+-		{
+-			LOG(LogError) << "Error - File type " << (format == FIF_UNKNOWN ? "unknown" : "unsupported") << "!";
+-		}
+-		//free FIMEMORY again
+-		FreeImage_CloseMemory(fiMemory);
+-	}
+-	return rawData;
++	width = height = 0;
++	if (!data || !size || size > 32 * 1024 * 1024) return {};
++	auto image = rgba(IMG_Load_RW(SDL_RWFromConstMem(data, static_cast<int>(size)), 1));
++	if (!image || image->w <= 0 || image->h <= 0 || image->w > 4096 || image->h > 4096) return {};
++	width = image->w;
++	height = image->h;
++	std::vector<unsigned char> pixels(width * height * 4);
++	// ES textures use bottom-up RGBA, while SDL surfaces are top-down.
++	for (size_t y = 0; y < height; ++y)
++		std::memcpy(pixels.data() + y * width * 4,
++			static_cast<unsigned char*>(image->pixels) + (height - y - 1) * image->pitch, width * 4);
++	return pixels;
++}
++
++bool ImageIO::resizeFile(const std::string& path, int maxWidth, int maxHeight)
++{
++	if (maxWidth == 0 && maxHeight == 0) return true;
++	if (maxWidth < 0 || maxHeight < 0 || maxWidth > 4096 || maxHeight > 4096) return false;
++	SDL_RWops* input = SDL_RWFromFile(path.c_str(), "rb");
++	if (!input) return false;
++	Sint64 bytes = SDL_RWsize(input);
++	if (bytes <= 0 || bytes > 32 * 1024 * 1024) { SDL_RWclose(input); return false; }
++	auto original = rgba(IMG_Load_RW(input, 1));
++	if (!original || original->w <= 0 || original->h <= 0) return false;
++	if (!maxWidth) maxWidth = std::max(1, maxHeight * original->w / original->h);
++	if (!maxHeight) maxHeight = std::max(1, maxWidth * original->h / original->w);
++	if (maxWidth > 4096 || maxHeight > 4096) return false;
++	Surface resized(SDL_CreateRGBSurfaceWithFormat(0, maxWidth, maxHeight, 32, SDL_PIXELFORMAT_RGBA32), SDL_FreeSurface);
++	if (!resized || SDL_SoftStretchLinear(original.get(), nullptr, resized.get(), nullptr) != 0) return false;
++	// Publish a complete PNG atomically. Content detection also handles a
++	// downloaded file retaining its original JPEG/WebP filename extension.
++	std::string temporary = path + ".XXXXXX";
++	int fd = mkstemp(&temporary[0]);
++	if (fd < 0) return false;
++	FILE* file = fdopen(fd, "wb");
++	if (!file) { close(fd); unlink(temporary.c_str()); return false; }
++	SDL_RWops* output = SDL_RWFromFP(file, SDL_TRUE);
++	if (!output) { fclose(file); unlink(temporary.c_str()); return false; }
++	bool saved = IMG_SavePNG_RW(resized.get(), output, 0) == 0;
++	if (SDL_RWclose(output) != 0) saved = false;
++	if (saved) saved = rename(temporary.c_str(), path.c_str()) == 0;
++	if (!saved) unlink(temporary.c_str());
++	return saved;
+ }
+ 
+ void ImageIO::flipPixelsVert(unsigned char* imagePx, const size_t& width, const size_t& height)
+--- a/es-app/src/scrapers/Scraper.cpp
++++ b/es-app/src/scrapers/Scraper.cpp
+@@ -6,7 +6,7 @@
+ #include "Log.h"
+ #include "Settings.h"
+ #include "SystemData.h"
+-#include <FreeImage.h>
++#include "ImageIO.h"
+ #include <fstream>
+ 
+ const std::map<std::string, generate_scraper_requests_func> scraper_request_funcs {
+@@ -247,59 +247,7 @@
+ //you can pass 0 for width or height to keep aspect ratio
+ bool resizeImage(const std::string& path, int maxWidth, int maxHeight)
+ {
+-	// nothing to do
+-	if(maxWidth == 0 && maxHeight == 0)
+-		return true;
+-
+-	FREE_IMAGE_FORMAT format = FIF_UNKNOWN;
+-	FIBITMAP* image = NULL;
+-
+-	//detect the filetype
+-	format = FreeImage_GetFileType(path.c_str(), 0);
+-	if(format == FIF_UNKNOWN)
+-		format = FreeImage_GetFIFFromFilename(path.c_str());
+-	if(format == FIF_UNKNOWN)
+-	{
+-		LOG(LogError) << "Error - could not detect filetype for image \"" << path << "\"!";
+-		return false;
+-	}
+-
+-	//make sure we can read this filetype first, then load it
+-	if(FreeImage_FIFSupportsReading(format))
+-	{
+-		image = FreeImage_Load(format, path.c_str());
+-	}else{
+-		LOG(LogError) << "Error - file format reading not supported for image \"" << path << "\"!";
+-		return false;
+-	}
+-
+-	float width = (float)FreeImage_GetWidth(image);
+-	float height = (float)FreeImage_GetHeight(image);
+-
+-	if(maxWidth == 0)
+-	{
+-		maxWidth = (int)((maxHeight / height) * width);
+-	}else if(maxHeight == 0)
+-	{
+-		maxHeight = (int)((maxWidth / width) * height);
+-	}
+-
+-	FIBITMAP* imageRescaled = FreeImage_Rescale(image, maxWidth, maxHeight, FILTER_BILINEAR);
+-	FreeImage_Unload(image);
+-
+-	if(imageRescaled == NULL)
+-	{
+-		LOG(LogError) << "Could not resize image! (not enough memory? invalid bitdepth?)";
+-		return false;
+-	}
+-
+-	bool saved = (FreeImage_Save(format, imageRescaled, path.c_str()) != 0);
+-	FreeImage_Unload(imageRescaled);
+-
+-	if(!saved)
+-		LOG(LogError) << "Failed to save resized image!";
+-
+-	return saved;
++	return ImageIO::resizeFile(path, maxWidth, maxHeight);
+ }
+ 
+ std::string getSaveAsPath(const ScraperSearchParams& params, const std::string& suffix, const std::string& extension)

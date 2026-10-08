@@ -11,7 +11,7 @@ command -v swig >/dev/null || { echo 'Install the build dependencies listed in d
 ./scripts/feeds install luci alsa-utils libdrm libexpat libzstd \
 	elfutils libudev-zero libsamplerate libusb-1.0 freetype libcurl \
 	libidn2 libiconv-full python-mako python-packaging gettext-full \
-	libpng bluez-daemon bluez-utils python-pyelftools python-yaml
+	libpng libjpeg-turbo libwebp bluez-daemon bluez-utils python-pyelftools python-yaml
 cp configs/rk3326.config .config
 if [ "$profile" = all ]; then
 	printf '\nCONFIG_TARGET_MULTI_PROFILE=y\nCONFIG_TARGET_ALL_PROFILES=y\n' >> .config

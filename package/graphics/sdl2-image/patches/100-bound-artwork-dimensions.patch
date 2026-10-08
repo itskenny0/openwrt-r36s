@@ -1,0 +1,44 @@
+--- a/src/IMG_png.c
++++ b/src/IMG_png.c
+@@ -290,6 +290,11 @@
+     lib.png_read_info(vars->png_ptr, vars->info_ptr);
+     lib.png_get_IHDR(vars->png_ptr, vars->info_ptr, &width, &height, &bit_depth,
+             &color_type, &interlace_type, NULL, NULL);
++    if (width > 4096 || height > 4096) {
++        vars->error = "Image dimensions exceed 4096 pixels";
++        return SDL_FALSE;
++    }
++
+ 
+     /* tell libpng to strip 16 bit/color files down to 8 bits/color */
+     lib.png_set_strip_16(vars->png_ptr);
+--- a/src/IMG_jpg.c
++++ b/src/IMG_jpg.c
+@@ -364,6 +364,12 @@
+     lib.jpeg_create_decompress(&vars->cinfo);
+     jpeg_SDL_RW_src(&vars->cinfo, src);
+     lib.jpeg_read_header(&vars->cinfo, TRUE);
++    if (vars->cinfo.image_width > 4096 || vars->cinfo.image_height > 4096) {
++        lib.jpeg_destroy_decompress(&vars->cinfo);
++        vars->error = "Image dimensions exceed 4096 pixels";
++        return SDL_FALSE;
++    }
++
+ 
+     if (vars->cinfo.num_components == 4) {
+         /* Set 32-bit Raw output */
+--- a/src/IMG_webp.c
++++ b/src/IMG_webp.c
+@@ -220,6 +220,12 @@
+         goto error;
+     }
+ 
++
++    if (features.width > 4096 || features.height > 4096) {
++        error = "Image dimensions exceed 4096 pixels";
++        goto error;
++    }
++
+     if (features.has_alpha) {
+        format = SDL_PIXELFORMAT_RGBA32;
+     } else {
